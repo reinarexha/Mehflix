@@ -9,14 +9,34 @@ export type Trailer = {
 }
 
 export async function fetchTrailersByCategory(category: string): Promise<Trailer[]> {
-  const { data, error } = await supabase
-    .from('trailers')
-    .select('id,title,youtube_id,category,poster_url')
-    .eq('category', category)
-    .limit(24)
+  try {
+    const { data, error } = await (supabase as any)
+      .from('trailers')
+      .select('id,title,youtube_id,category,poster_url')
+      .eq('category', category)
+      .limit(24)
 
-  if (error) throw error
-  return data ?? []
+    if (error) throw error
+    return data ?? []
+  } catch {
+    // Fallback to demo data when Supabase is unavailable
+    return Array.from({ length: 10 }).map((_, i) => ({
+      id: `${category}-${i}`,
+      title: `${capitalize(category)} Trailer ${i + 1}`,
+      youtube_id: demoIds[i % demoIds.length],
+      category,
+      poster_url: `https://picsum.photos/seed/${category}${i}/300/450`
+    }))
+  }
+}
+
+const demoIds = [
+  'dQw4w9WgXcQ', '3JZ_D3ELwOQ', 'hY7m5jjJ9mM', 'kxopViU98Xo', '9bZkp7q19f0',
+  'tVj0ZTS4WF4', 'CevxZvSJLk8', 'RgKAFK5djSk', 'OPf0YbXqDm0', '60ItHLz5WEA'
+]
+
+function capitalize(s: string) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
 
 export async function addToWatchlist(userId: string, trailerId: string) {
