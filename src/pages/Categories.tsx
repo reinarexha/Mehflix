@@ -20,13 +20,14 @@ const categories: Category[] = [
 export default function Categories() {
   return (
     <main className="max-w-[1280px] mx-auto p-4">
-      <h1 className="mt-0">Categories</h1>
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-        {categories.map(c => (
-          <StackedCard key={c.id} id={c.id} name={c.name} />
-        ))}
-      </div>
-    </main>
+  <h1 className="mt-0 mb-6 text-2xl">Categories</h1> {/* added mb-6 for spacing */}
+  <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+    {categories.map(c => (
+      <StackedCard key={c.id} id={c.id} name={c.name} />
+    ))}
+  </div>
+</main>
+
   )
 }
 
