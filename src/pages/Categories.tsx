@@ -19,9 +19,9 @@ const categories: Category[] = [
 
 export default function Categories() {
   return (
-    <main className="max-w-[1280px] mx-auto p-4">
-  <h1 className="mt-0 mb-6 text-2xl">Categories</h1> {/* added mb-6 for spacing */}
-  <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+    <main className="max-w-[1280px] mx-auto p-8">
+  <h1 className="mt-0 mb-10 text-2xl">Categories</h1>
+  <div className="grid gap-10" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
     {categories.map(c => (
       <StackedCard key={c.id} id={c.id} name={c.name} />
     ))}
@@ -32,42 +32,23 @@ export default function Categories() {
 }
 
 function StackedCard({ id, name }: { id: string; name: string }) {
-  // Dynamically load the category poster from assets/categories
-  const img = new URL(`../assets/categories/${id}.jpg`, import.meta.url).href
+  // Use three distinct poster images per category
+  const img1 = `https://picsum.photos/seed/${id}-1/300/450`
+  const img2 = `https://picsum.photos/seed/${id}-2/300/450`
+  const img3 = `https://picsum.photos/seed/${id}-3/300/450`
   const slug = id // use id for the category route
 
   return (
-    <Link to={`/category/${slug}`} className="no-underline text-inherit">
-      <div className="relative h-60 rounded-md overflow-hidden">
-        {/* Background layers */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/20 to-black/0 border border-white/10" />
-        <div className="absolute inset-0 opacity-60 blur-[1px] -rotate-2 scale-[0.98]" style={{
-          backgroundImage: `url(${img})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }} />
-        <div className="stacked-hover absolute inset-0 transition-transform duration-200 ease-out shadow-lg outline-2 outline-transparent" style={{
-          backgroundImage: `url(${img})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }} />
+    <Link to={`/category/${slug}`} className="no-underline text-inherit group">
+      <div className="relative h-64 rounded-md">
+        {/* Three stacked posters (symmetrical, spaced) */}
+        <img src={img1} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg opacity-70 -rotate-3 z-0" style={{ transform: 'translate(calc(-50% - 64px), 0)' }} />
+        <img src={img2} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg shadow-lg z-10" style={{ transform: 'translate(-50%, 0)' }} />
+        <img src={img3} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg rotate-3 ring-2 ring-transparent transition group-hover:ring-button z-20" style={{ transform: 'translate(calc(-50% + 64px), 0)' }} />
         {/* Category name */}
-        <div className="absolute left-3 bottom-3 px-2 py-1 bg-black/45 rounded focus-within:ring-2 focus-within:ring-button">
+        <div className="absolute left-3 bottom-3 px-2 py-1 bg-black/45 rounded">
           {name}
         </div>
-
-        <style>{`
-          .stacked-hover {
-            transform: translate(10px, -10px) scale(0.96);
-            box-shadow: 0 8px 18px rgba(0,0,0,0.35);
-          }
-          .stacked-hover:hover {
-            transform: translate(-6px, -16px) scale(1.08);
-            box-shadow: 0 24px 40px rgba(0,0,0,0.5);
-            outline-color: rgb(46 35 108);
-            z-index: 10;
-          }
-        `}</style>
       </div>
     </Link>
   )
