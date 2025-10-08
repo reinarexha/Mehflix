@@ -64,32 +64,54 @@ export default function Home() {
         )}
       </section>
 
-      <Section title="Popular now" movies={(popular ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo} />
-      <Section title="Coming soon" movies={(comingSoon ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo} ctaLabel="Remind me" />
-      <Section title="New releases" movies={(newReleases ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo} />
+      <Section
+        title="Popular now"
+        movies={(popular ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
+        loading={popular === null}
+      />
+      <Section
+        title="Coming soon"
+        movies={(comingSoon ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
+        ctaLabel="Remind me"
+        loading={comingSoon === null}
+      />
+      <Section
+        title="New releases"
+        movies={(newReleases ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
+        loading={newReleases === null}
+      />
     </main>
   )
 }
 
-function Section({ title, movies, ctaLabel }: { title: string; movies: Movie[]; ctaLabel?: string }) {
+function Section({ title, movies, ctaLabel, loading }: { title: string; movies: Movie[]; ctaLabel?: string; loading?: boolean }) {
   return (
     <section className="mb-6">
       <h2 className="mb-3">{title}</h2>
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-        {movies.map(m => (
-          <article key={m.id} className="bg-surface border border-white/10 rounded-md overflow-hidden transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl">
-            <Link to={`/movie/${m.id}`} className="no-underline text-inherit block">
-              <img src={m.poster} alt="" className="w-full h-[220px] object-cover block" />
+      <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+        {(loading ? Array.from({ length: 10 }).map((_, i) => ({ id: String(i), title: '', poster: '' })) : movies).map(m => (
+          loading ? (
+            <div key={m.id} className="animate-pulse bg-surface/60 border border-white/10 rounded-md overflow-hidden">
+              <div className="w-full h-[220px] bg-white/10" />
               <div className="px-3 py-2">
-                <div className="font-semibold">{m.title}</div>
+                <div className="h-4 w-2/3 bg-white/10 rounded" />
               </div>
-            </Link>
-            {ctaLabel && (
-              <div className="px-3 pb-3">
-                <button className="px-3 py-2 rounded-sm bg-button text-[#1c1530] font-semibold">{ctaLabel}</button>
-              </div>
-            )}
-          </article>
+            </div>
+          ) : (
+            <article key={m.id} className="bg-surface border border-white/10 rounded-md overflow-hidden transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl">
+              <Link to={`/movie/${m.id}`} className="no-underline text-inherit block">
+                <img src={m.poster} alt="" className="w-full h-[220px] object-cover block" />
+                <div className="px-3 py-2">
+                  <div className="font-semibold">{m.title}</div>
+                </div>
+              </Link>
+              {ctaLabel && (
+                <div className="px-3 pb-3">
+                  <button className="px-3 py-2 rounded-sm bg-button text-[#1c1530] font-semibold">{ctaLabel}</button>
+                </div>
+              )}
+            </article>
+          )
         ))}
       </div>
     </section>
