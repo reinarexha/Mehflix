@@ -9,6 +9,7 @@ export type Trailer = {
 }
 
 export async function fetchTrailersByCategory(category: string): Promise<Trailer[]> {
+  if (!supabase) return []
   const { data, error } = await supabase
     .from('trailers')
     .select('id,title,youtube_id,category,poster_url')
@@ -20,6 +21,7 @@ export async function fetchTrailersByCategory(category: string): Promise<Trailer
 }
 
 export async function addToWatchlist(userId: string, trailerId: string) {
+  if (!supabase) return
   const { error } = await supabase
     .from('watchlist')
     .insert({ user_id: userId, trailer_id: trailerId })
@@ -27,6 +29,7 @@ export async function addToWatchlist(userId: string, trailerId: string) {
 }
 
 export async function toggleFavorite(userId: string, trailerId: string) {
+  if (!supabase) return { favorited: false }
   const { data, error } = await supabase
     .from('favorites')
     .select('id')
@@ -45,6 +48,7 @@ export async function toggleFavorite(userId: string, trailerId: string) {
 }
 
 export async function addComment(userId: string, trailerId: string, content: string) {
+  if (!supabase) return
   const { error } = await supabase
     .from('comments')
     .insert({ user_id: userId, trailer_id: trailerId, content })
@@ -52,6 +56,7 @@ export async function addComment(userId: string, trailerId: string, content: str
 }
 
 export async function likeComment(userId: string, commentId: string) {
+  if (!supabase) return
   const { error } = await supabase
     .from('comment_likes')
     .insert({ user_id: userId, comment_id: commentId })
