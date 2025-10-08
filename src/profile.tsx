@@ -1,3 +1,3 @@
-function Profile () {
-    
+export default function Profile() {
+	return null
 }

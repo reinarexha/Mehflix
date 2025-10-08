@@ -1,44 +1,80 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-type Movie = { id: string; title: string; poster: string; trailer: string; releaseDate?: string }
+// Import all posters
+import poster1 from '../assets/posters/id1.jpg'
+import poster2 from '../assets/posters/id2.jpg'
+import poster3 from '../assets/posters/id3.jpg'
+import poster4 from '../assets/posters/id4.jpg'
+import poster5 from '../assets/posters/id5.jpg'
+import poster6 from '../assets/posters/id6.jpg'
+import poster7 from '../assets/posters/id7.jpg'
+import poster8 from '../assets/posters/id8.webp'
+import poster9 from '../assets/posters/id9.jpg'
+import poster10 from '../assets/posters/id10.jpg'
+import poster11 from '../assets/posters/id11.webp'
+import poster12 from '../assets/posters/id12.jpg'
+import poster13 from '../assets/posters/id13.webp'
+import poster14 from '../assets/posters/id14.jpg'
+import poster15 from '../assets/posters/id15.jpg'
+import poster16 from '../assets/posters/id16.jpg'
+import poster17 from '../assets/posters/id17.jpg'
+import poster18 from '../assets/posters/id18.jpg'
+import poster19 from '../assets/posters/id19.jpg'
+import poster20 from '../assets/posters/id20.jpg'
+import poster21 from '../assets/posters/id21.jpg'
+import poster22 from '../assets/posters/id22.jpg'
+import poster23 from '../assets/posters/id23.webp'
+import poster24 from '../assets/posters/id24.jpg'
+import poster25 from '../assets/posters/id25.jpg'
+import poster26 from '../assets/posters/id26.jpg'
+import poster27 from '../assets/posters/id27.jpg'
+import poster28 from '../assets/posters/id28.jpg'
+import poster29 from '../assets/posters/id29.jpg'
+import poster30 from '../assets/posters/id30.jpg'
 
+type Movie = {
+  id: string
+  title: string
+  poster: string
+  trailer: string
+  releaseDate?: string
+}
+
+// All movies with imported posters
 const moviesData: Movie[] = [
-  // Popular Now (10)
-  { id: '1', title: 'Tron: Ares', poster: 'https://m.media-amazon.com/images/M/MV5BZTMyMmYxMzQtNjFkZi00ZDFiLWE4NzQtMzI5NzE1ZjUxZTEzXkEyXkFqcGdeQXVyNDUzOTQ5MjY@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TronAresTrailer' },
-  { id: '2', title: 'Predator: Badlands', poster: 'https://m.media-amazon.com/images/M/MV5BZDI5ZDFiYzQtYzA1ZS00NjJlLWJkNjUtYmZkM2Q4MGJmZjYxXkEyXkFqcGdeQXVyNjQzOTk3Njk@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=PredatorBadlandsTrailer' },
-  { id: '3', title: 'Kiss of the Spider Woman', poster: 'https://m.media-amazon.com/images/M/MV5BNWQwMGFmZjAtZjk0Yi00MjM2LWE2YmYtNzZjMTYyMWQyZjRhXkEyXkFqcGdeQXVyNTE1NjY5Mg@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=KissOfTheSpiderWomanTrailer' },
-  { id: '4', title: 'The Carpenter’s Son', poster: 'https://m.media-amazon.com/images/M/MV5BNzdiY2QwZGUtN2QwNy00NjBhLWFjYmUtMzg2ZDljNzcyMzEzXkEyXkFqcGdeQXVyNjc1NTYyMjg@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheCarpentersSonTrailer' },
-  { id: '5', title: 'A House of Dynamite', poster: 'https://m.media-amazon.com/images/M/MV5BZmVjMDE4YmItZGM2Yy00OTU5LWIzOGMtY2I3ZTgwY2Y1NzU3XkEyXkFqcGdeQXVyNjQ1NjQwNTI@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=AHouseOfDynamiteTrailer' },
-  { id: '6', title: 'Soul on Fire', poster: 'https://m.media-amazon.com/images/M/MV5BZGU2Y2FjM2QtNmI0Yy00YzMzLTk4NzQtZjdlMjUxZDM2NzY2XkEyXkFqcGdeQXVyNjk0NTAzOA@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=SoulOnFireTrailer' },
-  { id: '7', title: 'The Bride', poster: 'https://m.media-amazon.com/images/M/MV5BYzY2NDc2NzctMTE4OC00NzEwLTgxNDctNDYwNzBiNjY0ZTRkXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheBrideTrailer' },
-  { id: '8', title: 'The Woman in Cabin 10', poster: 'https://m.media-amazon.com/images/M/MV5BM2QyZjY1NzAtNzQ0ZC00ZDE1LWE0NGItZTJjNDY0YjY4Mjk2XkEyXkFqcGdeQXVyNjY1MTg1MzQ@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheWomanInCabin10Trailer' },
-  { id: '9', title: '8 Femmes', poster: 'https://m.media-amazon.com/images/M/MV5BMjAyNzkxNjYxNl5BMl5BanBnXkFtZTcwNzM4NTQxMQ@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=8FemmesTrailer' },
-  { id: '10', title: 'The Holy Mountain', poster: 'https://m.media-amazon.com/images/M/MV5BMTkxNzc4MjM3NV5BMl5BanBnXkFtZTgwNTMwNjkzMzE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheHolyMountainTrailer' },
+  { id: '1', title: 'Tron: Ares', poster: poster1, trailer: 'https://www.youtube.com/watch?v=TronAresTrailer' },
+  { id: '2', title: 'Predator: Badlands', poster: poster2, trailer: 'https://www.youtube.com/watch?v=PredatorBadlandsTrailer' },
+  { id: '3', title: 'Kiss of the Spider Woman', poster: poster3, trailer: 'https://www.youtube.com/watch?v=KissOfTheSpiderWomanTrailer' },
+  { id: '4', title: 'The Carpenter’s Son', poster: poster4, trailer: 'https://www.youtube.com/watch?v=TheCarpentersSonTrailer' },
+  { id: '5', title: 'A House of Dynamite', poster: poster5, trailer: 'https://www.youtube.com/watch?v=AHouseOfDynamiteTrailer' },
+  { id: '6', title: 'Soul on Fire', poster: poster6, trailer: 'https://www.youtube.com/watch?v=SoulOnFireTrailer' },
+  { id: '7', title: 'The Bride', poster: poster7, trailer: 'https://www.youtube.com/watch?v=TheBrideTrailer' },
+  { id: '8', title: 'The Woman in Cabin 10', poster: poster8, trailer: 'https://www.youtube.com/watch?v=TheWomanInCabin10Trailer' },
+  { id: '9', title: '8 Femmes', poster: poster9, trailer: 'https://www.youtube.com/watch?v=8FemmesTrailer' },
+  { id: '10', title: 'The Holy Mountain', poster: poster10, trailer: 'https://www.youtube.com/watch?v=TheHolyMountainTrailer' },
 
-  // Coming Soon (10)
-  { id: '11', title: 'The Smashing Machine', poster: 'https://m.media-amazon.com/images/M/MV5BODkzMDk0OTctOTNmNy00MjU2LTk2NzctZDg0OTI5NDJiZDNiXkEyXkFqcGdeQXVyNjY5MTY0MjI@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheSmashingMachineTrailer', releaseDate: 'October 3, 2025' },
-  { id: '12', title: 'After the Hunt', poster: 'https://m.media-amazon.com/images/M/MV5BMjI0MzM0NjktMTI5MS00NDA3LWFiNDItZTQ1YmY2YmM1M2RlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=AfterTheHuntTrailer', releaseDate: 'October 3, 2025' },
-  { id: '13', title: 'Baaghi 4', poster: 'https://m.media-amazon.com/images/M/MV5BMTk5ODk5NjgxNF5BMl5BanBnXkFtZTgwNzU5NzQxNjE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=Baaghi4Trailer', releaseDate: 'September 5, 2025' },
-  { id: '14', title: 'Sarkeet', poster: 'https://m.media-amazon.com/images/M/MV5BMTI0MzUyMzE2OV5BMl5BanBnXkFtZTcwNTc1MTkzMw@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=SarkeetTrailer', releaseDate: 'May 8, 2025' },
-  { id: '15', title: 'How to Train Your Dragon', poster: 'https://m.media-amazon.com/images/M/MV5BMTk0NzE4MjEyNF5BMl5BanBnXkFtZTgwMzEzNjQzNDE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=HowToTrainYourDragon2025Trailer', releaseDate: 'June 13, 2025' },
-  { id: '16', title: 'Green Lantern', poster: 'https://m.media-amazon.com/images/M/MV5BMTQ5MjQ5Mjg5N15BMl5BanBnXkFtZTcwNjU3NjQ1OA@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=GreenLantern2025Trailer', releaseDate: 'July 15, 2025' },
-  { id: '17', title: 'Lilo & Stitch Live Action', poster: 'https://m.media-amazon.com/images/M/MV5BMTk2MjAxODU3Nl5BMl5BanBnXkFtZTgwNTYzOTUzNzM@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=LiloStitchLiveActionTrailer', releaseDate: 'August 20, 2025' },
-  { id: '18', title: 'Jurassic World 4: Extinction', poster: 'https://m.media-amazon.com/images/M/MV5BMTU1NjI2MDU3OV5BMl5BanBnXkFtZTgwODc3NzM3MzE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=JurassicWorld4ExtinctionTrailer', releaseDate: 'September 25, 2025' },
-  { id: '19', title: 'Captain America: Brave New World', poster: 'https://m.media-amazon.com/images/M/MV5BMTQyMzU4Nzk2M15BMl5BanBnXkFtZTgwNzI1MTYyMzE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=CaptainAmericaBraveNewWorldTrailer', releaseDate: 'October 15, 2025' },
-  { id: '20', title: 'The Invisible Force', poster: 'https://m.media-amazon.com/images/M/MV5BMjI1NzE1MzU5NV5BMl5BanBnXkFtZTgwNzc1NzE1NzE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheInvisibleForceTrailer', releaseDate: 'November 1, 2025' },
+  { id: '11', title: 'The Smashing Machine', poster: poster11, trailer: 'https://www.youtube.com/watch?v=TheSmashingMachineTrailer', releaseDate: 'October 3, 2025' },
+  { id: '12', title: 'After the Hunt', poster: poster12, trailer: 'https://www.youtube.com/watch?v=AfterTheHuntTrailer', releaseDate: 'October 3, 2025' },
+  { id: '13', title: 'Baaghi 4', poster: poster13, trailer: 'https://www.youtube.com/watch?v=Baaghi4Trailer', releaseDate: 'September 5, 2025' },
+  { id: '14', title: 'Sarkeet', poster: poster14, trailer: 'https://www.youtube.com/watch?v=SarkeetTrailer', releaseDate: 'May 8, 2025' },
+  { id: '15', title: 'How to Train Your Dragon', poster: poster15, trailer: 'https://www.youtube.com/watch?v=HowToTrainYourDragon2025Trailer', releaseDate: 'June 13, 2025' },
+  { id: '16', title: 'Green Lantern', poster: poster16, trailer: 'https://www.youtube.com/watch?v=GreenLantern2025Trailer', releaseDate: 'July 15, 2025' },
+  { id: '17', title: 'Lilo & Stitch Live Action', poster: poster17, trailer: 'https://www.youtube.com/watch?v=LiloStitchLiveActionTrailer', releaseDate: 'August 20, 2025' },
+  { id: '18', title: 'Jurassic World 4: Extinction', poster: poster18, trailer: 'https://www.youtube.com/watch?v=JurassicWorld4ExtinctionTrailer', releaseDate: 'September 25, 2025' },
+  { id: '19', title: 'Captain America: Brave New World', poster: poster19, trailer: 'https://www.youtube.com/watch?v=CaptainAmericaBraveNewWorldTrailer', releaseDate: 'October 15, 2025' },
+  { id: '20', title: 'The Invisible Force', poster: poster20, trailer: 'https://www.youtube.com/watch?v=TheInvisibleForceTrailer', releaseDate: 'November 1, 2025' },
 
-  // New Releases (10)
-  { id: '21', title: 'Roofman', poster: 'https://m.media-amazon.com/images/M/MV5BMTYyMzI1MzEzOV5BMl5BanBnXkFtZTgwNjk3NzEyMTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=RoofmanTrailer' },
-  { id: '22', title: 'Kambi Katna Kathai', poster: 'https://m.media-amazon.com/images/M/MV5BMTYyMzQ1MjMyNF5BMl5BanBnXkFtZTgwNjk0Nzk1MDE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=KambiKatnaKathaiTrailer' },
-  { id: '23', title: 'The Ballad of a Small Player', poster: 'https://m.media-amazon.com/images/M/MV5BMTU4Njk0NjYyMF5BMl5BanBnXkFtZTgwNzQ1NzE5MTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=TheBalladOfASmallPlayerTrailer' },
-  { id: '24', title: 'Mr. K', poster: 'https://m.media-amazon.com/images/M/MV5BMTU5MzU2NjkyOV5BMl5BanBnXkFtZTgwNjU3Nzg1MTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=MrKTrailer' },
-  { id: '25', title: 'Dear Luke, Love, Me', poster: 'https://m.media-amazon.com/images/M/MV5BMjQ1NjQyNzE2M15BMl5BanBnXkFtZTgwNzY0NzU3MjE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=DearLukeLoveMeTrailer' },
-  { id: '26', title: 'Springsteen: Deliver Me From Nowhere', poster: 'https://m.media-amazon.com/images/M/MV5BMTk2NzQ0NzUzNl5BMl5BanBnXkFtZTgwNjc2NjYzNzE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=SpringsteenDeliverMeFromNowhereTrailer' },
-  { id: '27', title: 'Soul on Fire', poster: 'https://m.media-amazon.com/images/M/MV5BZGU2Y2FjM2QtNmI0Yy00YzMzLTk4NzQtZjdlMjUxZDM2NzY2XkEyXkFqcGdeQXVyNjk0NTAzOA@@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=SoulOnFireTrailer' },
-  { id: '28', title: 'Re-Election', poster: 'https://m.media-amazon.com/images/M/MV5BMTk5NjM0NzUzNF5BMl5BanBnXkFtZTgwNzU1NzE5MTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=ReElectionTrailer' },
-  { id: '29', title: 'Caramelo', poster: 'https://m.media-amazon.com/images/M/MV5BMTg1NjI0NjUzNl5BMl5BanBnXkFtZTgwNjY1NjQ1NTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=CarameloTrailer' },
-  { id: '30', title: 'Bugonia', poster: 'https://m.media-amazon.com/images/M/MV5BMjI2NjQ0NzUzNF5BMl5BanBnXkFtZTgwNzQ1NzE5MTE@._V1_.jpg', trailer: 'https://www.youtube.com/watch?v=BugoniaTrailer' }
+  { id: '21', title: 'Roofman', poster: poster21, trailer: 'https://www.youtube.com/watch?v=RoofmanTrailer' },
+  { id: '22', title: 'Kambi Katna Kathai', poster: poster22, trailer: 'https://www.youtube.com/watch?v=KambiKatnaKathaiTrailer' },
+  { id: '23', title: 'The Ballad of a Small Player', poster: poster23, trailer: 'https://www.youtube.com/watch?v=TheBalladOfASmallPlayerTrailer' },
+  { id: '24', title: 'Mr. K', poster: poster24, trailer: 'https://www.youtube.com/watch?v=MrKTrailer' },
+  { id: '25', title: 'Dear Luke, Love, Me', poster: poster25, trailer: 'https://www.youtube.com/watch?v=DearLukeLoveMeTrailer' },
+  { id: '26', title: 'Springsteen: Deliver Me From Nowhere', poster: poster26, trailer: 'https://www.youtube.com/watch?v=SpringsteenDeliverMeFromNowhereTrailer' },
+  { id: '27', title: 'Soul on Fire', poster: poster27, trailer: 'https://www.youtube.com/watch?v=SoulOnFireTrailer' },
+  { id: '28', title: 'Re-Election', poster: poster28, trailer: 'https://www.youtube.com/watch?v=ReElectionTrailer' },
+  { id: '29', title: 'Caramelo', poster: poster29, trailer: 'https://www.youtube.com/watch?v=CarameloTrailer' },
+  { id: '30', title: 'Bugonia', poster: poster30, trailer: 'https://www.youtube.com/watch?v=BugoniaTrailer' }
 ]
 
 export default function Home() {
@@ -116,7 +152,7 @@ function Section({ title, movies, ctaLabel, onRemind }: { title: string; movies:
     <section style={{ marginBottom: '1.5rem' }}>
       <h2 style={{ margin: '0 0 0.75rem 0' }}>{title}</h2>
       <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', scrollSnapType: 'x mandatory' }}>
-        {movies.map((m, i) => {
+        {movies.map((m) => {
           const release = m.releaseDate ? new Date(m.releaseDate) : undefined
           const dateStr = release?.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
           return (
