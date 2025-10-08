@@ -54,17 +54,19 @@ const moviesData: Movie[] = [
   { id: '9', title: '8 Femmes', poster: poster9, trailer: 'https://www.youtube.com/watch?v=8FemmesTrailer' },
   { id: '10', title: 'The Holy Mountain', poster: poster10, trailer: 'https://www.youtube.com/watch?v=TheHolyMountainTrailer' },
 
-  { id: '11', title: 'The Smashing Machine', poster: poster11, trailer: 'https://www.youtube.com/watch?v=TheSmashingMachineTrailer', releaseDate: 'October 3, 2025' },
-  { id: '12', title: 'After the Hunt', poster: poster12, trailer: 'https://www.youtube.com/watch?v=AfterTheHuntTrailer', releaseDate: 'October 3, 2025' },
-  { id: '13', title: 'Baaghi 4', poster: poster13, trailer: 'https://www.youtube.com/watch?v=Baaghi4Trailer', releaseDate: 'September 5, 2025' },
-  { id: '14', title: 'Sarkeet', poster: poster14, trailer: 'https://www.youtube.com/watch?v=SarkeetTrailer', releaseDate: 'May 8, 2025' },
-  { id: '15', title: 'How to Train Your Dragon', poster: poster15, trailer: 'https://www.youtube.com/watch?v=HowToTrainYourDragon2025Trailer', releaseDate: 'June 13, 2025' },
-  { id: '16', title: 'Green Lantern', poster: poster16, trailer: 'https://www.youtube.com/watch?v=GreenLantern2025Trailer', releaseDate: 'July 15, 2025' },
-  { id: '17', title: 'Lilo & Stitch Live Action', poster: poster17, trailer: 'https://www.youtube.com/watch?v=LiloStitchLiveActionTrailer', releaseDate: 'August 20, 2025' },
-  { id: '18', title: 'Jurassic World 4: Extinction', poster: poster18, trailer: 'https://www.youtube.com/watch?v=JurassicWorld4ExtinctionTrailer', releaseDate: 'September 25, 2025' },
-  { id: '19', title: 'Captain America: Brave New World', poster: poster19, trailer: 'https://www.youtube.com/watch?v=CaptainAmericaBraveNewWorldTrailer', releaseDate: 'October 15, 2025' },
-  { id: '20', title: 'The Invisible Force', poster: poster20, trailer: 'https://www.youtube.com/watch?v=TheInvisibleForceTrailer', releaseDate: 'November 1, 2025' },
+  // Coming Soon (future releases)
+  { id: '11', title: 'The Smashing Machine', poster: poster11, trailer: 'https://www.youtube.com/watch?v=TheSmashingMachineTrailer' },
+  { id: '12', title: 'After the Hunt', poster: poster12, trailer: 'https://www.youtube.com/watch?v=AfterTheHuntTrailer' },
+  { id: '13', title: 'Baaghi 4', poster: poster13, trailer: 'https://www.youtube.com/watch?v=Baaghi4Trailer' },
+  { id: '14', title: 'Sarkeet', poster: poster14, trailer: 'https://www.youtube.com/watch?v=SarkeetTrailer' },
+  { id: '15', title: 'How to Train Your Dragon', poster: poster15, trailer: 'https://www.youtube.com/watch?v=HowToTrainYourDragon2025Trailer' },
+  { id: '16', title: 'Green Lantern', poster: poster16, trailer: 'https://www.youtube.com/watch?v=GreenLantern2025Trailer' },
+  { id: '17', title: 'Lilo & Stitch Live Action', poster: poster17, trailer: 'https://www.youtube.com/watch?v=LiloStitchLiveActionTrailer' },
+  { id: '18', title: 'Jurassic World 4: Extinction', poster: poster18, trailer: 'https://www.youtube.com/watch?v=JurassicWorld4ExtinctionTrailer' },
+  { id: '19', title: 'Captain America: Brave New World', poster: poster19, trailer: 'https://www.youtube.com/watch?v=CaptainAmericaBraveNewWorldTrailer' },
+  { id: '20', title: 'The Invisible Force', poster: poster20, trailer: 'https://www.youtube.com/watch?v=TheInvisibleForceTrailer' },
 
+  // New Releases (released within last 2 weeks)
   { id: '21', title: 'Roofman', poster: poster21, trailer: 'https://www.youtube.com/watch?v=RoofmanTrailer' },
   { id: '22', title: 'Kambi Katna Kathai', poster: poster22, trailer: 'https://www.youtube.com/watch?v=KambiKatnaKathaiTrailer' },
   { id: '23', title: 'The Ballad of a Small Player', poster: poster23, trailer: 'https://www.youtube.com/watch?v=TheBalladOfASmallPlayerTrailer' },
@@ -76,6 +78,28 @@ const moviesData: Movie[] = [
   { id: '29', title: 'Caramelo', poster: poster29, trailer: 'https://www.youtube.com/watch?v=CarameloTrailer' },
   { id: '30', title: 'Bugonia', poster: poster30, trailer: 'https://www.youtube.com/watch?v=BugoniaTrailer' }
 ]
+
+// --- Helper for relative date strings ---
+function relativeDate(from: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - from.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return '1d ago'
+  if (diffDays < 7) return `${diffDays}d ago`
+  const diffWeeks = Math.floor(diffDays / 7)
+  if (diffWeeks === 1) return '1w ago'
+  return `${diffWeeks}w ago`
+}
+
+// Assign release dates for New Releases (within last 14 days)
+const newReleasesIndices = Array.from({ length: 10 }, (_, i) => 20 + i)
+const releaseOffsets = [2, 5, 1, 3, 7, 10, 4, 6, 12, 9] // days ago
+newReleasesIndices.forEach((idx, i) => {
+  const date = new Date()
+  date.setDate(date.getDate() - releaseOffsets[i])
+  moviesData[idx].releaseDate = date.toISOString()
+})
 
 export default function Home() {
   const [query, setQuery] = useState('')
@@ -127,7 +151,7 @@ export default function Home() {
 
       <Section title="Popular Now" movies={moviesData.slice(0, 10)} />
       <Section title="Coming Soon" movies={moviesData.slice(10, 20)} ctaLabel="Remind me" onRemind={(date) => showToast(`You’ll be reminded when this movie releases on ${date}! 🍿`)} />
-      <Section title="New Releases" movies={moviesData.slice(20, 30)} />
+      <Section title="New Releases" movies={moviesData.slice(20, 30)} isRelative />
 
       {toast && (
         <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000 }}>
@@ -147,7 +171,7 @@ export default function Home() {
   )
 }
 
-function Section({ title, movies, ctaLabel, onRemind }: { title: string; movies: Movie[]; ctaLabel?: string; onRemind?: (date: string) => void }) {
+function Section({ title, movies, ctaLabel, onRemind, isRelative }: { title: string; movies: Movie[]; ctaLabel?: string; onRemind?: (date: string) => void; isRelative?: boolean }) {
   return (
     <section style={{ marginBottom: '1.5rem' }}>
       <h2 style={{ margin: '0 0 0.75rem 0' }}>{title}</h2>
@@ -161,7 +185,11 @@ function Section({ title, movies, ctaLabel, onRemind }: { title: string; movies:
                 <img src={m.poster} alt={m.title} style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} />
                 <div style={{ padding: '0.5rem 0.75rem' }}>
                   <div style={{ fontWeight: 600 }}>{m.title}</div>
-                  {m.releaseDate && <div style={{ fontSize: '0.875rem', color: 'var(--color-muted)' }}>{dateStr}</div>}
+                  {m.releaseDate && (
+                    <div style={{ fontSize: '0.875rem', color: 'var(--color-muted)' }}>
+                      {isRelative ? relativeDate(new Date(m.releaseDate)) : dateStr}
+                    </div>
+                  )}
                 </div>
               </Link>
               {ctaLabel && (
