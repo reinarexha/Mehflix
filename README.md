@@ -71,3 +71,38 @@ export default defineConfig([
   },
 ])
 ```
+
+## Environment Setup (Supabase)
+
+Create a `.env` file in the project root with:
+
+```
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+Database tables sketch:
+
+```
+-- trailers
+id uuid primary key default gen_random_uuid(),
+title text, youtube_id text, category text, poster_url text
+
+-- watchlist
+id uuid primary key default gen_random_uuid(),
+user_id uuid, trailer_id uuid
+
+-- favorites
+id uuid primary key default gen_random_uuid(),
+user_id uuid, trailer_id uuid
+
+-- comments
+id uuid primary key default gen_random_uuid(),
+user_id uuid, trailer_id uuid, content text, created_at timestamp default now()
+
+-- comment_likes
+id uuid primary key default gen_random_uuid(),
+user_id uuid, comment_id uuid
+```
+
+Storage bucket suggestion: `trailers` for poster images.
