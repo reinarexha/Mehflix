@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchTrailersByCategory, type Trailer } from '../lib/data'
 
 type Movie = { id: string; title: string; poster: string }
 
@@ -19,44 +18,43 @@ const demo: Movie[] = demoYouTubeIds.map((yt, i) => ({
 export default function Home() {
   const [query, setQuery] = useState('')
   const results = demo.filter(m => m.title.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
-  const [popular, setPopular] = useState<Trailer[] | null>(null)
-  const [comingSoon, setComingSoon] = useState<Trailer[] | null>(null)
-  const [newReleases, setNewReleases] = useState<Trailer[] | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [toastVisible, setToastVisible] = useState(false)
 
-  useEffect(() => {
-    // Attempt to fetch real data; fall back silently to demo if env not set
-    const run = async () => {
-      try {
-        const pop = await fetchTrailersByCategory('popular')
-        const soon = await fetchTrailersByCategory('coming-soon')
-        const newr = await fetchTrailersByCategory('new-release')
-        setPopular(pop)
-        setComingSoon(soon)
-        setNewReleases(newr)
-      } catch {
-        // ignore in dev without Supabase
-      }
-    }
-    run()
-  }, [])
+  const showToast = (message: string) => {
+    setToast(message)
+    setToastVisible(true)
+    window.clearTimeout((showToast as any)._t1)
+    window.clearTimeout((showToast as any)._t2)
+    ;(showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
+    ;(showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
+  }
 
   return (
-    <main className="max-w-[1280px] mx-auto p-4">
-      <section className="relative mb-4">
+    <main style={{ maxWidth: 1280, margin: '0 auto', padding: '1rem' }}>
+      <section style={{ position: 'relative', marginBottom: '1rem' }}>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search trailers..."
-          className="w-full px-4 py-3 rounded-md bg-input text-text border border-white/10 placeholder:text-muted"
+          style={{
+            width: '100%', padding: '0.75rem 1rem',
+            background: 'var(--color-input)', color: 'var(--color-text)',
+            border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--radius-md)'
+          }}
         />
         {query && (
-          <div className="absolute left-0 right-0 top-[110%] bg-surface rounded-md shadow-2xl overflow-hidden">
+          <div style={{
+            position: 'absolute', left: 0, right: 0, top: '110%',
+            background: 'var(--color-surface)', borderRadius: 'var(--radius-md)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)', overflow: 'hidden'
+          }}>
             {results.length === 0 && (
-              <div className="px-4 py-3 text-muted">No results</div>
+              <div style={{ padding: '0.75rem 1rem', color: 'var(--color-muted)' }}>No results</div>
             )}
             {results.map(r => (
-              <Link key={r.id} to={`/movie/${r.id}`} className="flex gap-3 px-3 py-2 no-underline text-inherit hover:bg-white/5">
-                <img src={r.poster} alt="" width={40} height={56} className="rounded object-cover" />
+              <Link key={r.id} to={`/movie/${r.id}`} style={{ display: 'flex', gap: '0.75rem', padding: '0.5rem 0.75rem', textDecoration: 'none', color: 'inherit' }}>
+                <img src={r.poster} alt="" width={40} height={56} style={{ borderRadius: 4, objectFit: 'cover' }} />
                 <span>{r.title}</span>
               </Link>
             ))}
@@ -64,55 +62,54 @@ export default function Home() {
         )}
       </section>
 
-      <Section
-        title="Popular now"
-        movies={(popular ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
-        loading={popular === null}
-      />
-      <Section
-        title="Coming soon"
-        movies={(comingSoon ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
-        ctaLabel="Remind me"
-        loading={comingSoon === null}
-      />
-      <Section
-        title="New releases"
-        movies={(newReleases ?? []).map(t => ({ id: t.youtube_id, title: t.title, poster: t.poster_url })) || demo}
-        loading={newReleases === null}
-      />
+      <Section title="Popular now" movies={demo} />
+      <Section title="Coming soon" movies={demo} ctaLabel="Remind me" onRemind={(date) => showToast(`You’ll be reminded when this movie releases on ${date}! 🍿`)} />
+      <Section title="New releases" movies={demo} />
+
+      {toast && (
+        <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000 }}>
+          <div style={{
+            background: 'var(--color-surface)',
+            color: 'var(--color-text)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '12px',
+            padding: '0.75rem 1rem',
+            boxShadow: '0 10px 24px rgba(0,0,0,0.35)',
+            opacity: toastVisible ? 1 : 0,
+            transition: 'opacity 300ms ease'
+          }}>{toast}</div>
+        </div>
+      )}
     </main>
   )
 }
 
-function Section({ title, movies, ctaLabel, loading }: { title: string; movies: Movie[]; ctaLabel?: string; loading?: boolean }) {
+function Section({ title, movies, ctaLabel, onRemind }: { title: string; movies: Movie[]; ctaLabel?: string; onRemind?: (date: string) => void }) {
   return (
-    <section className="mb-6">
-      <h2 className="mb-3">{title}</h2>
-      <div className="grid gap-3 sm:gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-        {(loading ? Array.from({ length: 10 }).map((_, i) => ({ id: String(i), title: '', poster: '' })) : movies).map(m => (
-          loading ? (
-            <div key={m.id} className="animate-pulse bg-surface/60 border border-white/10 rounded-md overflow-hidden">
-              <div className="w-full h-[220px] bg-white/10" />
-              <div className="px-3 py-2">
-                <div className="h-4 w-2/3 bg-white/10 rounded" />
+    <section style={{ marginBottom: '1.5rem' }}>
+      <h2 style={{ margin: '0 0 0.75rem 0' }}>{title}</h2>
+      <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', scrollSnapType: 'x mandatory' }}>
+        {movies.map((m, i) => {
+          const release = new Date(Date.now() + (i + 1) * 7 * 24 * 60 * 60 * 1000)
+          const dateStr = release.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+          return (
+          <article key={m.id} style={{ flex: '0 0 160px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', overflow: 'hidden', scrollSnapAlign: 'start' }}>
+            <Link to={`/movie/${m.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+              <img src={m.poster} alt="" style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} />
+              <div style={{ padding: '0.5rem 0.75rem' }}>
+                <div style={{ fontWeight: 600 }}>{m.title}</div>
               </div>
-            </div>
-          ) : (
-            <article key={m.id} className="bg-surface border border-white/10 rounded-md overflow-hidden transition-transform duration-150 ease-out hover:-translate-y-0.5 hover:shadow-xl">
-              <Link to={`/movie/${m.id}`} className="no-underline text-inherit block">
-                <img src={m.poster} alt="" className="w-full h-[220px] object-cover block" />
-                <div className="px-3 py-2">
-                  <div className="font-semibold">{m.title}</div>
-                </div>
-              </Link>
-              {ctaLabel && (
-                <div className="px-3 pb-3">
-                  <button className="px-3 py-2 rounded-sm bg-button text-[#1c1530] font-semibold">{ctaLabel}</button>
-                </div>
-              )}
-            </article>
-          )
-        ))}
+            </Link>
+            {ctaLabel && (
+              <div style={{ padding: '0 0.75rem 0.75rem' }}>
+                <button style={{
+                  background: 'var(--color-button)', color: '#1c1530', border: 'none',
+                  borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem', fontWeight: 600
+                }} onClick={() => onRemind && onRemind(dateStr)}>{ctaLabel}</button>
+              </div>
+            )}
+          </article>
+        )})}
       </div>
     </section>
   )

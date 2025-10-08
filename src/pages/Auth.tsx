@@ -27,8 +27,3 @@ export default function Auth({ mode: initialMode = 'login' as Mode }) {
   )
 }
 
-const inputStyle: React.CSSProperties = {}
-const buttonStyle: React.CSSProperties = {}
-const linkBtn: React.CSSProperties = {}
-
-
