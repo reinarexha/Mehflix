@@ -52,8 +52,8 @@ function StackedCard({ id, name }: { id: string; name: string }) {
         {img3 && (
           <img src={img3} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg rotate-3 ring-2 ring-transparent transition group-hover:ring-button z-20" style={{ transform: 'translate(calc(-50% + 64px), 0)' }} />
         )}
-        {/* Category name */}
-        <div className="absolute left-3 bottom-3 px-2 py-1 bg-black/45 rounded">
+        {/* Category name (above posters) */}
+        <div className="absolute left-3 bottom-3 px-2 py-1 bg-black/45 rounded z-30">
           {name}
         </div>
       </div>
