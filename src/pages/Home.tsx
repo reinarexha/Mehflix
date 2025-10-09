@@ -92,7 +92,16 @@ function relativeDate(from: Date): string {
   return `${diffWeeks}w ago`
 }
 
-// Assign release dates for New Releases (within last 14 days)
+// Assign release dates for Coming Soon (future: 2–6 weeks later)
+const comingSoonIndices = Array.from({ length: 10 }, (_, i) => 10 + i)
+const futureOffsets = [14, 21, 28, 35, 18, 24, 31, 42, 20, 38] // days from now
+comingSoonIndices.forEach((idx, i) => {
+  const date = new Date()
+  date.setDate(date.getDate() + futureOffsets[i])
+  moviesData[idx].releaseDate = date.toISOString()
+})
+
+// Assign release dates for New Releases (past 14 days)
 const newReleasesIndices = Array.from({ length: 10 }, (_, i) => 20 + i)
 const releaseOffsets = [2, 5, 1, 3, 7, 10, 4, 6, 12, 9] // days ago
 newReleasesIndices.forEach((idx, i) => {
@@ -173,8 +182,8 @@ export default function Home() {
 
 function Section({ title, movies, ctaLabel, onRemind, isRelative }: { title: string; movies: Movie[]; ctaLabel?: string; onRemind?: (date: string) => void; isRelative?: boolean }) {
   return (
-    <section style={{ marginBottom: '1.5rem' }}>
-      <h2 style={{ margin: '0 0 0.75rem 0' }}>{title}</h2>
+    <section style={{ marginBottom: '2.5rem' }}>
+      <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600 }}>{title}</h2>
       <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', scrollSnapType: 'x mandatory' }}>
         {movies.map((m) => {
           const release = m.releaseDate ? new Date(m.releaseDate) : undefined
