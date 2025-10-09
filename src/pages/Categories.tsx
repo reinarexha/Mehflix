@@ -32,19 +32,26 @@ export default function Categories() {
 }
 
 function StackedCard({ id, name }: { id: string; name: string }) {
-  // Use three distinct poster images per category
-  const img1 = `https://picsum.photos/seed/${id}-1/300/450`
-  const img2 = `https://picsum.photos/seed/${id}-2/300/450`
-  const img3 = `https://picsum.photos/seed/${id}-3/300/450`
+  // Load three posters from local assets for this category
+  const posters = getCategoryPosters(id)
+  const img1 = posters[0]
+  const img2 = posters[1] ?? posters[0]
+  const img3 = posters[2] ?? posters[1] ?? posters[0]
   const slug = id // use id for the category route
 
   return (
     <Link to={`/category/${slug}`} className="no-underline text-inherit group">
       <div className="relative h-64 rounded-md">
         {/* Three stacked posters (symmetrical, spaced) */}
-        <img src={img1} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg opacity-70 -rotate-3 z-0" style={{ transform: 'translate(calc(-50% - 64px), 0)' }} />
-        <img src={img2} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg shadow-lg z-10" style={{ transform: 'translate(-50%, 0)' }} />
-        <img src={img3} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg rotate-3 ring-2 ring-transparent transition group-hover:ring-button z-20" style={{ transform: 'translate(calc(-50% + 64px), 0)' }} />
+        {img1 && (
+          <img src={img1} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg opacity-70 -rotate-3 z-0" style={{ transform: 'translate(calc(-50% - 64px), 0)' }} />
+        )}
+        {img2 && (
+          <img src={img2} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg shadow-lg z-10" style={{ transform: 'translate(-50%, 0)' }} />
+        )}
+        {img3 && (
+          <img src={img3} alt="" className="absolute top-0 bottom-0 left-1/2 w-[160px] h-full object-cover rounded-lg rotate-3 ring-2 ring-transparent transition group-hover:ring-button z-20" style={{ transform: 'translate(calc(-50% + 64px), 0)' }} />
+        )}
         {/* Category name */}
         <div className="absolute left-3 bottom-3 px-2 py-1 bg-black/45 rounded">
           {name}
@@ -52,4 +59,16 @@ function StackedCard({ id, name }: { id: string; name: string }) {
       </div>
     </Link>
   )
+}
+
+// Import all category images eagerly as URLs
+const categoryImages = import.meta.glob('../assets/categories/**/*.{jpg,jpeg,jfif,png,webp}', { eager: true, as: 'url' }) as Record<string, string>
+
+function getCategoryPosters(categoryId: string): string[] {
+  const segment = `/assets/categories/${categoryId}/`
+  const urls = Object.entries(categoryImages)
+    .filter(([path]) => path.includes(segment))
+    .map(([, url]) => url)
+    .sort()
+  return urls.slice(0, 3)
 }
