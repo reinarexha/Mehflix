@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useUser } from '../hooks/useUser'
+import { toggleFavorite, toggleWatchlist } from '../lib/data'
 
 // Import all posters
 import poster1 from '../assets/posters/id1.jpg'
@@ -115,6 +117,9 @@ export default function Home() {
   const results = moviesData.filter(m => m.title.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
   const [toast, setToast] = useState<string | null>(null)
   const [toastVisible, setToastVisible] = useState(false)
+  const { user } = useUser()
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
+  const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set())
 
   const showToast = (message: string) => {
     setToast(message)
@@ -158,9 +163,75 @@ export default function Home() {
         )}
       </section>
 
-      <Section title="Popular Now" movies={moviesData.slice(0, 10)} />
-      <Section title="Coming Soon" movies={moviesData.slice(10, 20)} ctaLabel="Remind me" onRemind={(date) => showToast(`You’ll be reminded when this movie releases on ${date}! 🍿`)} />
-      <Section title="New Releases" movies={moviesData.slice(20, 30)} isRelative />
+      <Section
+        title="Popular Now"
+        movies={moviesData.slice(0, 10)}
+        favoriteIds={favoriteIds}
+        watchlistIds={watchlistIds}
+        onFavorite={async (id) => {
+          if (!user) return showToast('Please sign in to favorite movies')
+          const next = new Set(favoriteIds)
+          const isFav = next.has(id)
+          if (isFav) next.delete(id); else next.add(id)
+          setFavoriteIds(next)
+          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+        }}
+        onWatchlist={async (id) => {
+          if (!user) return showToast('Please sign in to manage watchlist')
+          const next = new Set(watchlistIds)
+          const inList = next.has(id)
+          if (inList) next.delete(id); else next.add(id)
+          setWatchlistIds(next)
+          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+        }}
+      />
+      <Section
+        title="Coming Soon"
+        movies={moviesData.slice(10, 20)}
+        ctaLabel="Remind me"
+        onRemind={(date) => showToast(`You’ll be reminded when this movie releases on ${date}! 🍿`)}
+        favoriteIds={favoriteIds}
+        watchlistIds={watchlistIds}
+        onFavorite={async (id) => {
+          if (!user) return showToast('Please sign in to favorite movies')
+          const next = new Set(favoriteIds)
+          const isFav = next.has(id)
+          if (isFav) next.delete(id); else next.add(id)
+          setFavoriteIds(next)
+          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+        }}
+        onWatchlist={async (id) => {
+          if (!user) return showToast('Please sign in to manage watchlist')
+          const next = new Set(watchlistIds)
+          const inList = next.has(id)
+          if (inList) next.delete(id); else next.add(id)
+          setWatchlistIds(next)
+          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+        }}
+      />
+      <Section
+        title="New Releases"
+        movies={moviesData.slice(20, 30)}
+        isRelative
+        favoriteIds={favoriteIds}
+        watchlistIds={watchlistIds}
+        onFavorite={async (id) => {
+          if (!user) return showToast('Please sign in to favorite movies')
+          const next = new Set(favoriteIds)
+          const isFav = next.has(id)
+          if (isFav) next.delete(id); else next.add(id)
+          setFavoriteIds(next)
+          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+        }}
+        onWatchlist={async (id) => {
+          if (!user) return showToast('Please sign in to manage watchlist')
+          const next = new Set(watchlistIds)
+          const inList = next.has(id)
+          if (inList) next.delete(id); else next.add(id)
+          setWatchlistIds(next)
+          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+        }}
+      />
 
       {toast && (
         <div style={{ position: 'fixed', top: 16, right: 16, zIndex: 1000 }}>
@@ -180,7 +251,17 @@ export default function Home() {
   )
 }
 
-function Section({ title, movies, ctaLabel, onRemind, isRelative }: { title: string; movies: Movie[]; ctaLabel?: string; onRemind?: (date: string) => void; isRelative?: boolean }) {
+function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, watchlistIds, onFavorite, onWatchlist }: {
+  title: string;
+  movies: Movie[];
+  ctaLabel?: string;
+  onRemind?: (date: string) => void;
+  isRelative?: boolean;
+  favoriteIds?: Set<string>;
+  watchlistIds?: Set<string>;
+  onFavorite?: (id: string) => void;
+  onWatchlist?: (id: string) => void;
+}) {
   return (
     <section style={{ marginBottom: '2.5rem' }}>
       <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600 }}>{title}</h2>
@@ -189,7 +270,7 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative }: { title: str
           const release = m.releaseDate ? new Date(m.releaseDate) : undefined
           const dateStr = release?.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
           return (
-            <article key={m.id} style={{ flex: '0 0 160px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', overflow: 'hidden', scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column' }}>
+            <article key={m.id} style={{ flex: '0 0 160px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', overflow: 'hidden', scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <Link to={`/movie/${m.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', flex: 1 }}>
                 <img src={m.poster} alt={m.title} style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} />
                 <div style={{ padding: '0.5rem 0.75rem' }}>
@@ -201,6 +282,28 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative }: { title: str
                   )}
                 </div>
               </Link>
+              {(onFavorite || onWatchlist) && (
+                <div style={{ display: 'flex', gap: 8, padding: '0 12px 12px' }}>
+                  {onWatchlist && (
+                    <button title="Watchlist" onClick={(e) => { e.preventDefault(); onWatchlist(m.id) }} style={{
+                      flex: 1,
+                      background: watchlistIds?.has(m.id) ? 'var(--color-button)' : 'rgba(255,255,255,0.08)',
+                      color: watchlistIds?.has(m.id) ? '#1c1530' : 'var(--color-text)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '8px', padding: '8px 10px', fontWeight: 600
+                    }}>Watchlist</button>
+                  )}
+                  {onFavorite && (
+                    <button title="Favorite" onClick={(e) => { e.preventDefault(); onFavorite(m.id) }} style={{
+                      width: 40,
+                      background: favoriteIds?.has(m.id) ? 'var(--color-button)' : 'rgba(255,255,255,0.08)',
+                      color: favoriteIds?.has(m.id) ? '#1c1530' : 'var(--color-text)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '8px', padding: '8px 0', fontWeight: 700
+                    }}>★</button>
+                  )}
+                </div>
+              )}
               {ctaLabel && (
                 <div style={{ padding: '0 0.75rem 0.75rem' }}>
                   <button style={{

@@ -10,13 +10,15 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 bg-surface border-b border-white/10">
       <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="font-bold text-button">Mehflix</div>
+        
+        {/* Website name on the far left */}
+        <div className="font-bold text-button mr-12">Mehflix</div>
 
-        {/* Links shifted a bit to the left/middle */}
-        <nav className="flex gap-4 ml-10">
-          <Link to="/" className={linkCls('/')}>
+        {/* Centered navigation links */}
+        <nav className="flex gap-6 justify-center flex-1">
+          <Link to="/home" className={linkCls('/home')}>
             Home
-            {pathname === '/' && (
+            {pathname === '/home' && (
               <span className="absolute left-3 right-3 -bottom-0.5 h-0.5 bg-button rounded-full" />
             )}
           </Link>
@@ -27,14 +29,12 @@ export default function Navbar() {
             )}
           </Link>
         </nav>
-
         {/* Profile round button on the far right */}
-        <div className="ml-auto">
+        <div className="ml-4">
           <Link
             to="/profile"
             className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-700"
           >
-            P
           </Link>
         </div>
       </div>
