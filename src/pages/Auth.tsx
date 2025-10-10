@@ -35,11 +35,12 @@ export default function Auth({ mode: initialMode = 'login' as Mode }) {
         setMessage('Account created. Please check your email to confirm.')
         navigate('/login')
       } else if (mode === 'forgot') {
+        // Updated: redirectTo points to /reset-password instead of /login
         const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + '/login',
+          redirectTo: window.location.origin + '/reset-password',
         })
         if (err) throw err
-        setMessage('Password reset email sent.')
+        setMessage('Password reset email sent. Please check your inbox.')
       }
     } catch (err: any) {
       setError(err.message ?? 'Something went wrong')
