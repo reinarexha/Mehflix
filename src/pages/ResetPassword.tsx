@@ -1,57 +1,65 @@
-// src/pages/ResetPassword.tsx
-import { useState, useEffect } from "react";
-import { useSearchParams, Navigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 
 export default function ResetPassword() {
-  const [password, setPassword] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("access_token"); // Supabase token
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate()
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setLoading(false);
-  }, []);
+    // Ensure we have a recovery session; if not, send back to login
+    supabase.auth.getSession().then(({ data }) => {
+      const type = (data?.session as any)?.type
+      if (!data?.session || (type && type !== 'recovery')) {
+        // still allow if session exists from the email link
+        // if completely missing, route to login
+        if (!data?.session) navigate('/login')
+      }
+    })
+  }, [navigate])
 
-  if (loading) return <p>Loading...</p>;
-  if (!token) return <Navigate to="/login" replace />;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const { error } = await supabase.auth.updateUser({
-      password,
-      email: undefined,
-    });
-
-    if (error) {
-      setError(error.message);
-    } else {
-      setSuccess(true);
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setMessage(null)
+    if (!password || password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
     }
-  };
-
-  if (success) return <Navigate to="/login" replace />;
+    if (password !== confirm) {
+      setError('Passwords do not match')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password })
+      if (err) throw err
+      setMessage('Password updated. You can now log in.')
+      setTimeout(() => navigate('/login'), 1200)
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to reset password')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div style={{ maxWidth: "400px", margin: "0 auto", padding: "2rem" }}>
-      <h2>Reset Password</h2>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <input
-          type="password"
-          placeholder="Enter new password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{ width: "100%", padding: "0.5rem", marginBottom: "1rem" }}
-        />
-        <button type="submit" style={{ width: "100%", padding: "0.5rem" }}>
-          Set New Password
-        </button>
-      </form>
-    </div>
-  );
+    <main className="min-h-screen grid place-items-center p-4">
+      <div className="w-full max-w-[460px] bg-surface rounded-md p-6 shadow-xl border border-white/10">
+        <h1 className="mt-0 mb-4 text-3xl font-bold">Reset password</h1>
+        {message && <div className="mb-3 text-[#1c1530] bg-button/90 rounded px-3 py-2">{message}</div>}
+        {error && <div className="mb-3 text-red-300 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">{error}</div>}
+        <form className="grid gap-3" onSubmit={onSubmit}>
+          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="New password" type="password" className="px-3 py-3 rounded-sm border border-white/10 bg-input text-text" />
+          <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm new password" type="password" className="px-3 py-3 rounded-sm border border-white/10 bg-input text-text" />
+          <button disabled={loading} className="px-4 py-3 rounded-sm bg-button text-[#1c1530] font-bold w-full">{loading ? 'Updating…' : 'Update password'}</button>
+        </form>
+      </div>
+    </main>
+  )
 }
+

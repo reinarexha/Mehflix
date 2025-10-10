@@ -7,41 +7,13 @@
   --color-button: #C8ACD6;
   --color-text: #ffffff;
   --color-muted: #bfc3d9;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
 }
 
-@layer base {
-  :root {
-    color-scheme: dark;
-  }
-  body {
-    @apply m-0 min-h-screen bg-bg text-text;
-    min-width: 320px;
-    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  }
-  a {
-    @apply font-medium text-button hover:text-[#e7d6ef] no-underline;
-  }
-  h1 { @apply text-4xl leading-tight; }
-  button {
-    @apply rounded-sm border border-transparent px-4 py-2 text-base font-semibold bg-button text-[#1c1530] cursor-pointer transition-transform duration-150 ease-out;
-  }
-  button:hover { @apply -translate-y-px shadow-lg; }
-  button:focus-visible { outline: 2px solid #e7d6ef; }
-}
+:root { color-scheme: dark; }
+html, body { margin: 0; min-height: 100%; background: var(--color-bg); color: var(--color-text); font-family: system-ui, Avenir, Helvetica, Arial, sans-serif; }
+a { color: var(--color-button); text-decoration: none; }
+a:hover { opacity: 0.9; }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
+/* Utility to hide scrollbars while keeping scroll functionality */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { width: 0; height: 0; }

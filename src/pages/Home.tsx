@@ -174,7 +174,7 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -182,7 +182,7 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
       <Section
@@ -198,7 +198,7 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -206,7 +206,7 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
       <Section
@@ -221,7 +221,7 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id) } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -229,7 +229,7 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id) } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
 
@@ -273,34 +273,70 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, w
             <article key={m.id} style={{ flex: '0 0 160px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', overflow: 'hidden', scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <Link to={`/movie/${m.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', flex: 1 }}>
                 <img src={m.poster} alt={m.title} style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} />
-                <div style={{ padding: '0.5rem 0.75rem' }}>
+                <div style={isRelative ? { padding: '0.5rem 0.75rem', minHeight: 62, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } : { padding: '0.5rem 0.75rem' }}>
                   <div style={{ fontWeight: 600 }}>{m.title}</div>
-                  {m.releaseDate && (
+                  {isRelative ? (
                     <div style={{ fontSize: '0.875rem', color: 'var(--color-muted)' }}>
-                      {isRelative ? relativeDate(new Date(m.releaseDate)) : dateStr}
+                      {m.releaseDate ? relativeDate(new Date(m.releaseDate)) : ''}
                     </div>
+                  ) : (
+                    m.releaseDate ? (
+                      <div style={{ fontSize: '0.875rem', color: 'var(--color-muted)' }}>{dateStr}</div>
+                    ) : null
                   )}
                 </div>
               </Link>
               {(onFavorite || onWatchlist) && (
-                <div style={{ display: 'flex', gap: 8, padding: '0 12px 12px' }}>
+                <div style={{ display: 'flex', alignItems: 'stretch', padding: '0 0 8px 0', margin: '0 8px' }}>
+                  {/* Watchlist icon (left) */}
                   {onWatchlist && (
-                    <button title="Watchlist" onClick={(e) => { e.preventDefault(); onWatchlist(m.id) }} style={{
-                      flex: 1,
-                      background: watchlistIds?.has(m.id) ? 'var(--color-button)' : 'rgba(255,255,255,0.08)',
-                      color: watchlistIds?.has(m.id) ? '#1c1530' : 'var(--color-text)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: '8px', padding: '8px 10px', fontWeight: 600
-                    }}>Watchlist</button>
+                    <button
+                      title="Add to watchlist"
+                      onClick={(e) => { e.preventDefault(); onWatchlist(m.id) }}
+                      style={{
+                        flex: 1,
+                        display: 'grid', placeItems: 'center',
+                        background: 'transparent',
+                        color: watchlistIds?.has(m.id) ? 'var(--color-button)' : 'var(--color-text)',
+                        border: 'none',
+                        borderRadius: '6px 0 0 6px',
+                        padding: '10px 0',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {/* clock icon */}
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 1.75a10.25 10.25 0 1 0 0 20.5 10.25 10.25 0 0 0 0-20.5Zm0 18.5A8.25 8.25 0 1 1 12 3.75a8.25 8.25 0 0 1 0 16.5Zm.75-13.5h-1.5v6l5 3 .75-1.23-4.25-2.52V6.75Z"/>
+                      </svg>
+                    </button>
                   )}
+                  {/* Divider */}
+                  <div style={{ width: 1, background: 'rgba(255,255,255,0.12)' }} />
+                  {/* Favorite icon (right) */}
                   {onFavorite && (
-                    <button title="Favorite" onClick={(e) => { e.preventDefault(); onFavorite(m.id) }} style={{
-                      width: 40,
-                      background: favoriteIds?.has(m.id) ? 'var(--color-button)' : 'rgba(255,255,255,0.08)',
-                      color: favoriteIds?.has(m.id) ? '#1c1530' : 'var(--color-text)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: '8px', padding: '8px 0', fontWeight: 700
-                    }}>★</button>
+                    <button
+                      title="Favorite"
+                      onClick={(e) => { e.preventDefault(); onFavorite(m.id) }}
+                      style={{
+                        flex: 1,
+                        display: 'grid', placeItems: 'center',
+                        background: 'transparent',
+                        color: favoriteIds?.has(m.id) ? 'var(--color-button)' : 'var(--color-text)',
+                        border: 'none',
+                        borderRadius: '0 6px 6px 0',
+                        padding: '10px 0',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      {/* star icon */}
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27Z"/>
+                      </svg>
+                    </button>
                   )}
                 </div>
               )}
