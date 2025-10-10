@@ -13,18 +13,35 @@ export function useUser() {
   useEffect(() => {
     let isMounted = true
     const init = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (!isMounted) return
-      setUser(data.user ? { id: data.user.id, email: data.user.email ?? undefined } : null)
-      setLoading(false)
+      try {
+        const { data } = await supabase.auth.getUser()
+        if (!isMounted) return
+        setUser(data.user ? { id: data.user.id, email: data.user.email ?? undefined } : null)
+      } catch (error) {
+        console.warn('Error getting user:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
     init()
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null)
-    })
-    return () => {
-      isMounted = false
-      sub.subscription.unsubscribe()
+    
+    try {
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ? { id: session.user.id, email: session.user.email ?? undefined } : null)
+      })
+      return () => {
+        isMounted = false
+        if (sub?.subscription) {
+          sub.subscription.unsubscribe()
+        }
+      }
+    } catch (error) {
+      console.warn('Error setting up auth state change listener:', error)
+      setLoading(false)
+      return () => {
+        isMounted = false
+      }
     }
   }, [])
 
