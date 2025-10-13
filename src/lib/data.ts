@@ -132,6 +132,30 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
   return trailersData.filter(Boolean)
 }
 
+// Remove a specific watchlist row by its row id
+export async function removeWatchlistRow(rowId: string) {
+  // Prefer supabase client if available
+  try {
+    if (typeof (supabase as any).from === 'function') {
+      const { error } = await supabase.from('watchlist').delete().eq('id', rowId)
+      if (error) throw error
+      return true
+    }
+  } catch (err) {
+    // fall through to network fallback
+    console.warn('Supabase removeWatchlistRow failed, falling back to HTTP delete:', err)
+  }
+
+  // Fallback: try a server-side HTTP endpoint (if present)
+  try {
+    const res = await fetch(`/api/watchlist/${rowId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('HTTP delete failed')
+    return true
+  } catch (err) {
+    throw err
+  }
+}
+
 // ---------------- Movie/Trailer Functions ----------------
 
 // Optional: static local trailers (for testing before Supabase)

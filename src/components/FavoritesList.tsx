@@ -8,6 +8,7 @@ import { useUser } from '../hooks/useUser'
 const FavoritesList: React.FC = () => {
   const { user } = useUser()
   const [trailers, setTrailers] = useState<Trailer[]>([])
+  const [unknownIds, setUnknownIds] = useState<string[]>([])
 
   useEffect(() => {
     if (!user) return
@@ -17,10 +18,11 @@ const FavoritesList: React.FC = () => {
         const res = await fetch(`/api/favorites/${user.id}`)
         if (!res.ok) throw new Error('Failed to fetch favorites')
         const ids: string[] = await res.json()
-        const favTrailers = ids
-          .map(id => getTrailerById(id))
-          .filter((t): t is Trailer => t !== undefined)
+        const mapped = ids.map(id => getTrailerById(id))
+        const favTrailers = mapped.filter((t): t is Trailer => t !== undefined)
+  const unresolved = ids.filter((_, idx) => mapped[idx] === undefined)
         setTrailers(favTrailers)
+        setUnknownIds(unresolved)
       } catch (err) {
         console.error(err)
       }
@@ -33,9 +35,22 @@ const FavoritesList: React.FC = () => {
     if (!user) return
     try {
       const trailer = getTrailerById(trailerId)
-      if (!trailer) return
-      await toggleFavorite(user.id, trailer)
-      setTrailers(prev => prev.filter(t => t.id !== trailerId))
+      if (trailer) {
+        await toggleFavorite(user.id, trailer)
+        setTrailers(prev => prev.filter(t => t.id !== trailerId))
+        return
+      }
+
+      // Fallback: construct a minimal trailer object so toggleFavorite can remove the favorite
+      const minimal: Trailer = {
+        id: trailerId,
+        title: 'Unavailable',
+        youtube_id: trailerId,
+        category: 'Unknown',
+        poster_url: '/posters/placeholder.jpg',
+      }
+      await toggleFavorite(user.id, minimal)
+      setUnknownIds(prev => prev.filter(id => id !== trailerId))
     } catch (err) {
       console.error(err)
     }
@@ -43,7 +58,7 @@ const FavoritesList: React.FC = () => {
 
   if (!user) return <p className="text-white">Please log in to see favorites.</p>
 
-  if (trailers.length === 0)
+  if (trailers.length === 0 && unknownIds.length === 0)
     return <p className="text-white">You have no favorite trailers.</p>
 
   return (
@@ -55,6 +70,22 @@ const FavoritesList: React.FC = () => {
           userId={user.id}
           onRemoveFavorite={() => handleRemoveFavorite(trailer.id)}
         />
+      ))}
+
+      {unknownIds.map(id => (
+        <div
+          key={`unknown-${id}`}
+          className="bg-gray-800 rounded overflow-hidden flex flex-col items-center justify-center p-4 text-white"
+        >
+          <div className="text-sm mb-2">Unavailable item</div>
+          <div className="text-xs mb-3 break-all">ID: {id}</div>
+          <button
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+            onClick={() => handleRemoveFavorite(id)}
+          >
+            Remove
+          </button>
+        </div>
       ))}
     </div>
   )

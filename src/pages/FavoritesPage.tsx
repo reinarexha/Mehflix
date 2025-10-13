@@ -20,6 +20,28 @@ export default function FavoritesPage({ userId }: Props) {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const handleRemove = async (favId: string, trailerId: string) => {
+    if (!userId) return
+    try {
+      const trailer = getTrailerById(trailerId)
+      if (trailer) {
+        await toggleFavorite(userId, trailer)
+      } else {
+        const minimal: Trailer = {
+          id: trailerId,
+          title: 'Unavailable',
+          youtube_id: trailerId,
+          category: 'Unknown',
+          poster_url: '/posters/placeholder.jpg',
+        }
+        await toggleFavorite(userId, minimal)
+      }
+      setFavorites(prev => prev.filter(f => f.id !== favId))
+    } catch (e) {
+      console.error('Failed to remove favorite', e)
+    }
+  }
+
   useEffect(() => {
     if (!userId) return;
 
@@ -57,7 +79,18 @@ export default function FavoritesPage({ userId }: Props) {
           {favorites.map((item) => {
             const trailer: Trailer | undefined = getTrailerById(item.trailer_id)
             if (!trailer) {
-              return <div key={item.id} className="p-3 bg-surface border border-white/10 rounded">ID: {item.trailer_id}</div>
+              return (
+                <div key={item.id} className="p-3 bg-surface border border-white/10 rounded flex flex-col items-center">
+                  <div className="text-sm mb-2">Unavailable item</div>
+                  <div className="text-xs mb-3 break-all">ID: {item.trailer_id}</div>
+                  <button
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
+                    onClick={() => handleRemove(item.id, item.trailer_id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )
             }
             return (
               <Link key={item.id} to={`/movie/${trailer.youtube_id}`} className="no-underline text-inherit">
