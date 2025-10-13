@@ -12,7 +12,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     // Ensure we have a recovery session; if not, send back to login
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }: { data: any }) => {
       const type = (data?.session as any)?.type
       if (!data?.session || (type && type !== 'recovery')) {
         // still allow if session exists from the email link

@@ -126,8 +126,8 @@ export default function Home() {
     setToastVisible(true)
     window.clearTimeout((showToast as any)._t1)
     window.clearTimeout((showToast as any)._t2)
-    ;(showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
-    ;(showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
+      ; (showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
+      ; (showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
   }
 
   return (
@@ -308,7 +308,7 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, w
                     >
                       {/* clock icon */}
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 1.75a10.25 10.25 0 1 0 0 20.5 10.25 10.25 0 0 0 0-20.5Zm0 18.5A8.25 8.25 0 1 1 12 3.75a8.25 8.25 0 0 1 0 16.5Zm.75-13.5h-1.5v6l5 3 .75-1.23-4.25-2.52V6.75Z"/>
+                        <path d="M12 1.75a10.25 10.25 0 1 0 0 20.5 10.25 10.25 0 0 0 0-20.5Zm0 18.5A8.25 8.25 0 1 1 12 3.75a8.25 8.25 0 0 1 0 16.5Zm.75-13.5h-1.5v6l5 3 .75-1.23-4.25-2.52V6.75Z" />
                       </svg>
                     </button>
                   )}
@@ -334,7 +334,7 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, w
                     >
                       {/* star icon */}
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                        <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27Z"/>
+                        <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27Z" />
                       </svg>
                     </button>
                   )}
@@ -345,6 +345,8 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, w
                   <button style={{
                     width: '100%',
                     background: 'var(--color-button)', color: '#1c1530', border: 'none',
+                    cursor: 'pointer',           // <-- makes the cursor a hand
+                    transition: 'background 0.2s', // optional smooth hover
                     borderRadius: 'var(--radius-sm)', padding: '0.5rem 0', fontWeight: 600
                   }} onClick={() => onRemind && onRemind(dateStr!)}>{ctaLabel}</button>
                 </div>
