@@ -1,57 +1,63 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import MovieCard from "./MovieCard";
+// src/components/FavoritesList.tsx
+import React, { useEffect, useState } from 'react'
+import MovieCard from './MovieCard'
+import type { Trailer } from '../lib/data'
+import { getTrailerById, toggleFavorite } from '../lib/data'
+import { useUser } from '../hooks/useUser'
 
-type Props = { userId: string };
-
-export default function FavoritesList({ userId }: Props) {
-  const [movies, setMovies] = useState<any[]>([]);
+const FavoritesList: React.FC = () => {
+  const { user } = useUser()
+  const [trailers, setTrailers] = useState<Trailer[]>([])
 
   useEffect(() => {
-    async function loadFavorites() {
-      const { data, error } = await supabase
-        .from("favorites")
-        .select("movies(*)")
-        .eq("user_id", userId);
+    if (!user) return
 
-      if (error) {
-        alert(error.message);
-        return;
+    const fetchFavorites = async () => {
+      try {
+        const res = await fetch(`/api/favorites/${user.id}`)
+        if (!res.ok) throw new Error('Failed to fetch favorites')
+        const ids: string[] = await res.json()
+        const favTrailers = ids
+          .map(id => getTrailerById(id))
+          .filter((t): t is Trailer => t !== undefined)
+        setTrailers(favTrailers)
+      } catch (err) {
+        console.error(err)
       }
-
-      setMovies(data.map((item: any) => item.movies));
     }
 
-    loadFavorites();
-  }, [userId]);
+    fetchFavorites()
+  }, [user])
 
-  async function handleRemoveFavorite(movieId: number) {
-    const { error } = await supabase
-      .from("favorites")
-      .delete()
-      .eq("user_id", userId)
-      .eq("movie_id", movieId);
-
-    if (error) {
-      alert(error.message);
-      return;
+  const handleRemoveFavorite = async (trailerId: string) => {
+    if (!user) return
+    try {
+      const trailer = getTrailerById(trailerId)
+      if (!trailer) return
+      await toggleFavorite(user.id, trailer)
+      setTrailers(prev => prev.filter(t => t.id !== trailerId))
+    } catch (err) {
+      console.error(err)
     }
-
-    setMovies((prev) => prev.filter((m) => m.id !== movieId));
   }
 
-  if (!movies.length) return <p className="p-4">No favorites yet.</p>;
+  if (!user) return <p className="text-white">Please log in to see favorites.</p>
+
+  if (trailers.length === 0)
+    return <p className="text-white">You have no favorite trailers.</p>
 
   return (
-    <div className="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 p-4">
-      {movies.map((movie) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
+      {trailers.map(trailer => (
         <MovieCard
-          key={movie.id}
-          movie={movie}
-          userId={userId}
-          onRemoveFavorite={handleRemoveFavorite}
+          key={trailer.id}
+          trailer={trailer}
+          userId={user.id}
+          onRemoveFavorite={() => handleRemoveFavorite(trailer.id)}
         />
       ))}
     </div>
-  );
+  )
 }
+
+export default FavoritesList

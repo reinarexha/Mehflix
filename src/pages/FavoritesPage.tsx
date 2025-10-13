@@ -1,6 +1,9 @@
 // src/pages/FavoritesPage.tsx
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { getTrailerById, type Trailer, toggleFavorite } from '../lib/data';
+import MovieCard from '../components/MovieCard';
+import { Link } from 'react-router-dom';
 
 type FavoriteItem = {
   id: string;
@@ -50,11 +53,30 @@ export default function FavoritesPage({ userId }: Props) {
       {favorites.length === 0 ? (
         <p>No favorite trailers yet.</p>
       ) : (
-        <ul>
-          {favorites.map((item) => (
-            <li key={item.id}>Trailer ID: {item.trailer_id}</li>
-          ))}
-        </ul>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {favorites.map((item) => {
+            const trailer: Trailer | undefined = getTrailerById(item.trailer_id)
+            if (!trailer) {
+              return <div key={item.id} className="p-3 bg-surface border border-white/10 rounded">ID: {item.trailer_id}</div>
+            }
+            return (
+              <Link key={item.id} to={`/movie/${trailer.youtube_id}`} className="no-underline text-inherit">
+                <MovieCard
+                  trailer={trailer}
+                  onRemoveFavorite={async () => {
+                    try {
+                      await toggleFavorite(userId, trailer)
+                      // refresh list
+                      setFavorites(prev => prev.filter(f => f.id !== item.id))
+                    } catch (e) {
+                      console.error('Failed to remove favorite', e)
+                    }
+                  }}
+                />
+              </Link>
+            )
+          })}
+        </div>
       )}
     </div>
   );

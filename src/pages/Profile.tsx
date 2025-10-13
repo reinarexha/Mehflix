@@ -1,26 +1,24 @@
 // src/pages/Profile.tsx
-import { useEffect, useState } from 'react';
-import { useUser } from '../hooks/useUser';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react'
+import { useUser } from '../hooks/useUser'
+import { Link } from 'react-router-dom'
 
-type ProfileProps = {
-  userId: string;
-};
-
-const Profile: React.FC<ProfileProps> = ({ userId }) => {
-  const { user } = useUser();
-  const [username, setUsername] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+const Profile: React.FC = () => {
+  const { user } = useUser()
+  const [username, setUsername] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user) {
-      const meta = (user as any).user_metadata;
-      setUsername(meta?.username || null);
+      const meta = (user as any).user_metadata
+      setUsername(meta?.username || null)
     }
-    setLoading(false);
-  }, [user]);
+    setLoading(false)
+  }, [user])
 
-  if (loading) return <div className="text-white text-center mt-20">Loading profile...</div>;
+  if (loading)
+    return <div className="text-white text-center mt-20">Loading profile...</div>
+
   if (!user)
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">
@@ -29,7 +27,7 @@ const Profile: React.FC<ProfileProps> = ({ userId }) => {
           <p>Please log in to see your profile.</p>
         </div>
       </div>
-    );
+    )
 
   return (
     <div className="flex justify-center bg-gray-900 min-h-screen p-6">
@@ -40,19 +38,34 @@ const Profile: React.FC<ProfileProps> = ({ userId }) => {
         </div>
 
         <div className="flex flex-wrap justify-center gap-3 mb-6">
-          <Link to="/edit-info" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+          <Link
+            to="/edit-info"
+            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
+          >
             Edit Info
           </Link>
-          <Link to="/change-password" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+          <Link
+            to="/change-password"
+            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
+          >
             Change Password
           </Link>
-          <Link to="/watchlist" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+          <Link
+            to="/watchlist"
+            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
+          >
             Watchlist
           </Link>
-          <Link to="/favorites" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+          <Link
+            to="/favorites"
+            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
+          >
             Favorites
           </Link>
-          <Link to="/ratings" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+          <Link
+            to="/ratings"
+            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
+          >
             Ratings
           </Link>
         </div>
@@ -68,7 +81,7 @@ const Profile: React.FC<ProfileProps> = ({ userId }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Profile;
+export default Profile

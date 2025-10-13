@@ -23,25 +23,23 @@ import PersonalInfoPage from './pages/PersonalInfoPage';
 
 import './App.css';
 
-// Wrappers so TypeScript knows these pages receive userId
-const WatchlistPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <WatchlistPage userId={userId} />
-);
+// Wrappers so TypeScript knows these pages receive userId when needed
+const WatchlistPageWrapper: React.FC = () => <WatchlistPage />
 const FavoritesPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
   <FavoritesPage userId={userId} />
-);
+)
 const RatingsPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
   <RatingsPage userId={userId} />
-);
+)
 const ChangePasswordPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
   <ChangePasswordPage userId={userId} />
-);
+)
 const EditInfoPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
   <EditInfoPage userId={userId} />
-);
+)
 const PersonalInfoPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
   <PersonalInfoPage userId={userId} />
-);
+)
 
 function App() {
   const { user, loading } = useUser();
@@ -73,7 +71,7 @@ function App() {
           >
             <Route path="/home" element={<Home />} />
             <Route path="/categories" element={<Categories />} />
-            <Route path="/profile" element={user ? <Profile userId={user.id} /> : <Navigate to="/login" replace />} />
+            <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" replace />} />
             <Route path="/movie/:id" element={<Movie />} />
             <Route path="/category/:slug" element={<CategoryPage />} />
             <Route path="/search" element={<Home />} />
@@ -81,7 +79,7 @@ function App() {
             {/* Profile subpages */}
             {user && (
               <>
-                <Route path="/watchlist" element={<WatchlistPageWrapper userId={user.id} />} />
+                <Route path="/watchlist" element={<WatchlistPageWrapper />} />
                 <Route path="/favorites" element={<FavoritesPageWrapper userId={user.id} />} />
                 <Route path="/ratings" element={<RatingsPageWrapper userId={user.id} />} />
                 <Route path="/change-password" element={<ChangePasswordPageWrapper userId={user.id} />} />
