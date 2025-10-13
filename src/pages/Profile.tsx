@@ -29,55 +29,53 @@ const Profile: React.FC = () => {
       </div>
     )
 
+  const initials = (username || user.email || 'U').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase()
+
   return (
-    <div className="flex justify-center bg-gray-900 min-h-screen p-6">
-      <div className="bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md text-white">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold mb-2">{username || user.email}</h2>
-          <p className="text-gray-300">{user.email}</p>
-        </div>
+    <div className="min-h-screen bg-gray-900 p-6 flex justify-center">
+      <div className="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg overflow-hidden text-white">
+        <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left: avatar & basic info */}
+          <div className="flex flex-col items-center md:items-start md:col-span-1">
+            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-3xl font-bold mb-4">
+              {initials}
+            </div>
+            <h2 className="text-xl font-bold">{username || user.email}</h2>
+            <p className="text-gray-300 mt-1">{user.email}</p>
+            <div className="mt-4 flex flex-col gap-2 w-full">
+              <Link to="/edit-info" className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md">Edit Info</Link>
+              <Link to="/change-password" className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md">Change Password</Link>
+            </div>
+          </div>
 
-        <div className="flex flex-wrap justify-center gap-3 mb-6">
-          <Link
-            to="/edit-info"
-            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
-          >
-            Edit Info
-          </Link>
-          <Link
-            to="/change-password"
-            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
-          >
-            Change Password
-          </Link>
-          <Link
-            to="/watchlist"
-            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
-          >
-            Watchlist
-          </Link>
-          <Link
-            to="/favorites"
-            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
-          >
-            Favorites
-          </Link>
-          <Link
-            to="/ratings"
-            className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold"
-          >
-            Ratings
-          </Link>
-        </div>
+          {/* Middle: stats & quick links */}
+          <div className="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-gray-700 rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-3">My Activity</h3>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <Link to="/watchlist" className="bg-gray-800 rounded-md p-3">
+                  <div className="text-xl font-bold">—</div>
+                  <div className="text-xs text-gray-300">Watchlist</div>
+                </Link>
+                <Link to="/favorites" className="bg-gray-800 rounded-md p-3">
+                  <div className="text-xl font-bold">—</div>
+                  <div className="text-xs text-gray-300">Favorites</div>
+                </Link>
+                <Link to="/ratings" className="bg-gray-800 rounded-md p-3">
+                  <div className="text-xl font-bold">—</div>
+                  <div className="text-xs text-gray-300">Ratings</div>
+                </Link>
+              </div>
+            </div>
 
-        <div className="bg-gray-700 rounded-lg p-4">
-          <h3 className="text-xl font-semibold text-center mb-4">Personal Info</h3>
-          <p className="mb-2">
-            <strong>Email:</strong> {user.email}
-          </p>
-          <p>
-            <strong>Username:</strong> {username || 'Not set'}
-          </p>
+            <div className="bg-gray-700 rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-3">Personal Info</h3>
+              <div className="text-sm text-gray-300 space-y-2">
+                <div><strong>Email:</strong> {user.email}</div>
+                <div><strong>Username:</strong> {username || 'Not set'}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
