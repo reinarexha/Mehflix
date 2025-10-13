@@ -84,6 +84,7 @@ export default function Auth({ mode: initialMode = 'login' as Mode }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
+            autoComplete='on'
             type="email"
             className="px-3 py-3 rounded-sm border border-white/10 bg-input text-text"
           />

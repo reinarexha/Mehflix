@@ -14,7 +14,7 @@ import ResetPassword from './pages/ResetPassword';
 import './App.css';
 
 function App() {
-  const { user } = useUser();
+  const { user, loading } = useUser();
   const location = useLocation();
 
   const hideNavbarOnRoutes = ['/', '/login', '/signup', '/forgot-password', '/reset-password'];
@@ -33,7 +33,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes */}
-        <Route element={<ProtectedRoute user={user}><Outlet /></ProtectedRoute>}>
+        <Route element={<ProtectedRoute user={user} loading={loading}><Outlet /></ProtectedRoute>}>
           <Route path="/home" element={<Home />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/profile" element={<Profile />} />
