@@ -1,61 +1,74 @@
-import { Link } from 'react-router-dom'
+// src/pages/Profile.tsx
+import { useEffect, useState } from 'react';
+import { useUser } from '../hooks/useUser';
+import { Link } from 'react-router-dom';
 
-export default function ProfilePage() {
-  const name = 'Guest User'
-  const email = 'guest@example.com'
+type ProfileProps = {
+  userId: string;
+};
+
+const Profile: React.FC<ProfileProps> = ({ userId }) => {
+  const { user } = useUser();
+  const [username, setUsername] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      const meta = (user as any).user_metadata;
+      setUsername(meta?.username || null);
+    }
+    setLoading(false);
+  }, [user]);
+
+  if (loading) return <div className="text-white text-center mt-20">Loading profile...</div>;
+  if (!user)
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Guest User</h1>
+          <p>Please log in to see your profile.</p>
+        </div>
+      </div>
+    );
 
   return (
-    <main className="max-w-[1280px] mx-auto p-6">
-      {/* Header */}
-      <header className="flex items-center gap-4">
-        <div className="w-20 h-20 rounded-full bg-[#2E236C] grid place-items-center text-2xl font-bold text-button">
-          {name.charAt(0).toUpperCase()}
+    <div className="flex justify-center bg-gray-900 min-h-screen p-6">
+      <div className="bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md text-white">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold mb-2">{username || user.email}</h2>
+          <p className="text-gray-300">{user.email}</p>
         </div>
-        <div className="flex-1">
-          <div className="text-2xl font-bold">{name.toLowerCase()}</div>
-          <div className="text-muted">{email}</div>
-        </div>
-        <button className="px-4 py-2 rounded-sm bg-button text-[#1c1530] font-semibold">Log out</button>
-      </header>
-      <div className="border-b border-white/10 my-6" />
 
-      {/* Sections */}
-      <section className="mb-8">
-        <h2 className="mt-0 mb-2 text-xl font-semibold">Watchlist</h2>
-        <div className="text-muted">No items yet</div>
-      </section>
-      <section className="mb-8">
-        <h2 className="mt-0 mb-2 text-xl font-semibold">Favorites</h2>
-        <div className="text-muted">No favorites yet</div>
-      </section>
-      <section className="mb-8">
-        <h2 className="mt-0 mb-2 text-xl font-semibold">Ratings</h2>
-        <div className="text-muted">No ratings yet</div>
-      </section>
-      <section className="mb-8">
-        <h2 className="mt-0 mb-2 text-xl font-semibold">Notifications</h2>
-        <ul className="text-muted list-disc pl-6">
-          <li>Reminder alerts will appear here.</li>
-          <li>Likes and comments on your posts will appear here.</li>
-        </ul>
-      </section>
-
-      {/* Account actions */}
-      <section className="mt-10">
-        <h2 className="mt-0 mb-4 text-xl font-semibold">Account</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link to="#" className="no-underline">
-            <div className="rounded-md bg-[#2E236C] px-4 py-5 text-text text-center font-medium hover:shadow-xl transition">Change password</div>
+        <div className="flex flex-wrap justify-center gap-3 mb-6">
+          <Link to="/edit-info" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+            Edit Info
           </Link>
-          <Link to="#" className="no-underline">
-            <div className="rounded-md bg-[#2E236C] px-4 py-5 text-text text-center font-medium hover:shadow-xl transition">Edit info</div>
+          <Link to="/change-password" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+            Change Password
           </Link>
-          <Link to="#" className="no-underline">
-            <div className="rounded-md bg-[#2E236C] px-4 py-5 text-text text-center font-medium hover:shadow-xl transition">Personal info</div>
+          <Link to="/watchlist" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+            Watchlist
+          </Link>
+          <Link to="/favorites" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+            Favorites
+          </Link>
+          <Link to="/ratings" className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg font-semibold">
+            Ratings
           </Link>
         </div>
-      </section>
-    </main>
-  )
-}
 
+        <div className="bg-gray-700 rounded-lg p-4">
+          <h3 className="text-xl font-semibold text-center mb-4">Personal Info</h3>
+          <p className="mb-2">
+            <strong>Email:</strong> {user.email}
+          </p>
+          <p>
+            <strong>Username:</strong> {username || 'Not set'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Profile;
