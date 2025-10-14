@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useUser } from '../hooks/useUser'
-import { addComment, fetchComments, toggleFavorite, toggleLikeComment, toggleWatchlist, type CommentRow } from '../lib/data'
+import { toggleFavorite, toggleWatchlist, getTrailerById, fetchFavorites, fetchWatchlist, type CommentRow, type Trailer } from '../lib/data'
+import { supabase } from '../lib/supabaseClient'
 
 export default function Movie() {
   const { id } = useParams()
@@ -23,6 +24,52 @@ export default function Movie() {
     }
     run()
   }, [videoId])
+
+  useEffect(() => {
+    async function loadStatus() {
+      if (!user || !videoId) return
+      try {
+        const favs = await fetchFavorites(user.id)
+        const wls = await fetchWatchlist(user.id)
+        const trailer = getTrailerById(videoId) ?? { id: videoId, title: 'Unknown', youtube_id: videoId, category: 'Unknown', poster_url: '' }
+        setIsFav(favs.some(t => t.id === trailer.id || t.youtube_id === trailer.youtube_id))
+        setInList(wls.some(t => t.id === trailer.id || t.youtube_id === trailer.youtube_id))
+      } catch (e) {
+        console.error('Failed to load favorite/watchlist status', e)
+      }
+    }
+    loadStatus()
+  }, [user, videoId])
+
+  // Local comment helpers (supabase-backed)
+  async function fetchComments(trailerId: string): Promise<CommentRow[]> {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('trailer_id', trailerId.toString())
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as CommentRow[]
+  }
+
+  async function addComment(userId: string, trailerId: string, content: string) {
+    const { data, error } = await supabase
+      .from('comments')
+      .insert([{ user_id: userId, trailer_id: trailerId, content }])
+      .select()
+    if (error) throw error
+    return data?.[0]
+  }
+
+  async function toggleLikeComment(commentId: string) {
+    // Naive implementation: increment likes on the comment row
+  const { data: existing, error: e } = await supabase.from('comments').select('likes').eq('id', commentId).maybeSingle()
+    if (e) throw e
+    const current = (existing?.likes ?? 0) as number
+    const { error } = await supabase.from('comments').update({ likes: current + 1 }).eq('id', commentId)
+    if (error) throw error
+    return { liked: true }
+  }
 
   return (
     <main className="max-w-[1080px] mx-auto p-4">
@@ -48,14 +95,24 @@ export default function Movie() {
             <button onClick={async () => {
               if (!user) return alert('Please sign in to use watchlist')
               setInList(v => !v)
-              try { await toggleWatchlist(user.id, videoId) } catch { setInList(v => !v) }
+              try {
+                const trailer: Trailer = getTrailerById(videoId) ?? { id: videoId, title: 'Unknown', youtube_id: videoId, category: 'unknown', poster_url: '' }
+                await toggleWatchlist(user.id, trailer)
+              } catch {
+                setInList(v => !v)
+              }
             }} className="px-3 py-2 rounded-sm font-semibold border border-white/10" style={{ background: inList ? 'var(--color-button)' : 'rgba(255,255,255,0.08)', color: inList ? '#1c1530' : 'var(--color-text)' }}>
               {inList ? 'In Watchlist' : 'Add to Watchlist'}
             </button>
             <button onClick={async () => {
               if (!user) return alert('Please sign in to favorite')
               setIsFav(v => !v)
-              try { await toggleFavorite(user.id, videoId) } catch { setIsFav(v => !v) }
+              try {
+                const trailer: Trailer = getTrailerById(videoId) ?? { id: videoId, title: 'Unknown', youtube_id: videoId, category: 'unknown', poster_url: '' }
+                await toggleFavorite(user.id, trailer)
+              } catch {
+                setIsFav(v => !v)
+              }
             }} className="px-3 py-2 rounded-sm border border-white/10" style={{ background: isFav ? 'var(--color-button)' : 'rgba(255,255,255,0.08)', color: isFav ? '#1c1530' : 'var(--color-text)' }}>
               {isFav ? 'Favorited' : 'Favorite'}
             </button>
@@ -98,7 +155,7 @@ export default function Movie() {
                     if (!user) return alert('Please sign in to like comments')
                     // optimistic count
                     setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: (x.likes ?? 0) + 1 } : x))
-                    try { await toggleLikeComment(user.id, c.id) } catch { setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x)) }
+                    try { await toggleLikeComment(c.id) } catch { setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x)) }
                   }} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Like ({c.likes ?? 0})</button>
                 </div>
               ))}

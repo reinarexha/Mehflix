@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../hooks/useUser'
-import { toggleFavorite, toggleWatchlist } from '../lib/data'
+import { toggleFavorite, toggleWatchlist, getTrailerById, fetchFavorites, fetchWatchlist, type Trailer } from '../lib/data'
 
 // Import all posters
 import poster1 from '../assets/posters/id1.jpg'
@@ -121,6 +121,31 @@ export default function Home() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set())
 
+  // initialize favorites/watchlist from server when user logs in
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      if (!user) {
+        if (mounted) {
+          setFavoriteIds(new Set())
+          setWatchlistIds(new Set())
+        }
+        return
+      }
+      try {
+        const favs = await fetchFavorites(user.id)
+        const wls = await fetchWatchlist(user.id)
+        if (!mounted) return
+        setFavoriteIds(new Set(favs.map(t => t.id)))
+        setWatchlistIds(new Set(wls.map(t => t.id)))
+      } catch (e) {
+        console.error('Failed to load favorites/watchlist', e)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [user])
+
   const showToast = (message: string) => {
     setToast(message)
     setToastVisible(true)
@@ -174,7 +199,18 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try {
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
+            await toggleFavorite(user.id, trailer)
+            showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
+          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -182,7 +218,18 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try {
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
+            await toggleWatchlist(user.id, trailer)
+            showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
+          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
       <Section
@@ -198,7 +245,18 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try {
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
+            await toggleFavorite(user.id, trailer)
+            showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
+          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -206,7 +264,11 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try {
+            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            await toggleWatchlist(user.id, trailer)
+            showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
+          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
       <Section
@@ -221,7 +283,11 @@ export default function Home() {
           const isFav = next.has(id)
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
-          try { await toggleFavorite(user.id, id); showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites') } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          try {
+            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            await toggleFavorite(user.id, trailer)
+            showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
+          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -229,7 +295,11 @@ export default function Home() {
           const inList = next.has(id)
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
-          try { await toggleWatchlist(user.id, id); showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist') } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          try {
+            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            await toggleWatchlist(user.id, trailer)
+            showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
+          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
         }}
       />
 
@@ -249,6 +319,18 @@ export default function Home() {
       )}
     </main>
   )
+}
+
+// helper: extract youtube id from a full youtube watch url (very small extractor)
+function extractYoutubeId(url: string): string {
+  try {
+    const u = new URL(url)
+    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v') || ''
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1)
+    return url
+  } catch {
+    return url
+  }
 }
 
 function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, watchlistIds, onFavorite, onWatchlist }: {

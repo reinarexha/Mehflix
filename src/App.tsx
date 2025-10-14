@@ -23,25 +23,28 @@ import PersonalInfoPage from './pages/PersonalInfoPage';
 
 import './App.css';
 
-// Wrappers so TypeScript knows these pages receive userId
-const WatchlistPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <WatchlistPage userId={userId} />
-);
-const FavoritesPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <FavoritesPage userId={userId} />
-);
-const RatingsPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <RatingsPage userId={userId} />
-);
-const ChangePasswordPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <ChangePasswordPage userId={userId} />
-);
-const EditInfoPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <EditInfoPage userId={userId} />
-);
-const PersonalInfoPageWrapper: React.FC<{ userId: string }> = ({ userId }) => (
-  <PersonalInfoPage userId={userId} />
-);
+// Wrappers that obtain the user themselves so routes can always be registered
+const WatchlistPageWrapper: React.FC = () => <WatchlistPage />
+const FavoritesPageWrapper: React.FC = () => {
+  const { user } = useUser()
+  return <FavoritesPage userId={user ? user.id : ''} />
+}
+const RatingsPageWrapper: React.FC = () => {
+  const { user } = useUser()
+  return <RatingsPage userId={user ? user.id : ''} />
+}
+const ChangePasswordPageWrapper: React.FC = () => {
+  const { user } = useUser()
+  return <ChangePasswordPage userId={user ? user.id : ''} />
+}
+const EditInfoPageWrapper: React.FC = () => {
+  const { user } = useUser()
+  return <EditInfoPage userId={user ? user.id : ''} />
+}
+const PersonalInfoPageWrapper: React.FC = () => {
+  const { user } = useUser()
+  return <PersonalInfoPage userId={user ? user.id : ''} />
+}
 
 function App() {
   const { user, loading } = useUser();
@@ -73,22 +76,18 @@ function App() {
           >
             <Route path="/home" element={<Home />} />
             <Route path="/categories" element={<Categories />} />
-            <Route path="/profile" element={user ? <Profile userId={user.id} /> : <Navigate to="/login" replace />} />
+            <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" replace />} />
             <Route path="/movie/:id" element={<Movie />} />
             <Route path="/category/:slug" element={<CategoryPage />} />
             <Route path="/search" element={<Home />} />
 
-            {/* Profile subpages */}
-            {user && (
-              <>
-                <Route path="/watchlist" element={<WatchlistPageWrapper userId={user.id} />} />
-                <Route path="/favorites" element={<FavoritesPageWrapper userId={user.id} />} />
-                <Route path="/ratings" element={<RatingsPageWrapper userId={user.id} />} />
-                <Route path="/change-password" element={<ChangePasswordPageWrapper userId={user.id} />} />
-                <Route path="/edit-info" element={<EditInfoPageWrapper userId={user.id} />} />
-                <Route path="/personal-info" element={<PersonalInfoPageWrapper userId={user.id} />} />
-              </>
-            )}
+            {/* Profile subpages (always registered; wrappers decide how to handle missing user) */}
+            <Route path="/watchlist" element={<WatchlistPageWrapper />} />
+            <Route path="/favorites" element={<FavoritesPageWrapper />} />
+            <Route path="/ratings" element={<RatingsPageWrapper />} />
+            <Route path="/change-password" element={<ChangePasswordPageWrapper />} />
+            <Route path="/edit-info" element={<EditInfoPageWrapper />} />
+            <Route path="/personal-info" element={<PersonalInfoPageWrapper />} />
           </Route>
 
           {/* Catch all */}

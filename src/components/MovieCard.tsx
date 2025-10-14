@@ -1,100 +1,126 @@
-import { supabase } from "../lib/supabaseClient";
-import { useState } from "react";
+// src/components/MovieCard.tsx
+import React from 'react'
 
-type Props = {
-  movie: any;
-  userId: string;
-  onRemoveFavorite?: (movieId: number) => void;
-  onRemoveWatchlist?: (movieId: number) => void;
-};
+// Import all posters
+import id1 from '../assets/posters/id1.jpg'
+import id2 from '../assets/posters/id2.jpg'
+import id3 from '../assets/posters/id3.jpg'
+import id4 from '../assets/posters/id4.jpg'
+import id5 from '../assets/posters/id5.jpg'
+import id6 from '../assets/posters/id6.jpg'
+import id7 from '../assets/posters/id7.jpg'
+import id8 from '../assets/posters/id8.webp'
+import id9 from '../assets/posters/id9.jpg'
+import id10 from '../assets/posters/id10.jpg'
+import id11 from '../assets/posters/id11.webp'
+import id12 from '../assets/posters/id12.jpg'
+import id13 from '../assets/posters/id13.webp'
+import id14 from '../assets/posters/id14.jpg'
+import id15 from '../assets/posters/id15.jpg'
+import id16 from '../assets/posters/id16.jpg'
+import id17 from '../assets/posters/id17.jpg'
+import id18 from '../assets/posters/id18.jpg'
+import id19 from '../assets/posters/id19.jpg'
+import id20 from '../assets/posters/id20.jpg'
+import id21 from '../assets/posters/id21.jpg'
+import id22 from '../assets/posters/id22.jpg'
+import id23 from '../assets/posters/id23.webp'
+import id24 from '../assets/posters/id24.jpg'
+import id25 from '../assets/posters/id25.jpg'
+import id26 from '../assets/posters/id26.jpg'
+import id27 from '../assets/posters/id27.jpg'
+import id28 from '../assets/posters/id28.jpg'
+import id29 from '../assets/posters/id29.jpg'
+import id30 from '../assets/posters/id30.jpg'
 
-export default function MovieCard({
-  movie,
-  userId,
+import type { Trailer } from '../lib/data'
+
+type MovieCardProps = {
+  trailer: Trailer
+  userId?: string
+  onRemoveFavorite?: (trailerId: string) => Promise<void>
+  onRemoveWatchlist?: (trailerId: string) => Promise<void>
+}
+
+const posterMap: Record<string, string> = {
+  '1': id1,
+  '2': id2,
+  '3': id3,
+  '4': id4,
+  '5': id5,
+  '6': id6,
+  '7': id7,
+  '8': id8,
+  '9': id9,
+  '10': id10,
+  '11': id11,
+  '12': id12,
+  '13': id13,
+  '14': id14,
+  '15': id15,
+  '16': id16,
+  '17': id17,
+  '18': id18,
+  '19': id19,
+  '20': id20,
+  '21': id21,
+  '22': id22,
+  '23': id23,
+  '24': id24,
+  '25': id25,
+  '26': id26,
+  '27': id27,
+  '28': id28,
+  '29': id29,
+  '30': id30,
+}
+
+const MovieCard: React.FC<MovieCardProps> = ({
+  trailer,
   onRemoveFavorite,
   onRemoveWatchlist,
-}: Props) {
-  const [loadingWatchlist, setLoadingWatchlist] = useState(false);
-  const [loadingFavorite, setLoadingFavorite] = useState(false);
-
-  async function addToWatchlist() {
-    if (!userId) return alert("Login required");
-    setLoadingWatchlist(true);
-
-    const { error } = await supabase.from("watchlist").insert([
-      { user_id: userId, movie_id: movie.id },
-    ]);
-
-    setLoadingWatchlist(false);
-    if (error) alert(error.message);
-    else alert("Added to Watchlist ✅");
-  }
-
-  async function addToFavorites() {
-    if (!userId) return alert("Login required");
-    setLoadingFavorite(true);
-
-    const { error } = await supabase.from("favorites").insert([
-      { user_id: userId, movie_id: movie.id },
-    ]);
-
-    setLoadingFavorite(false);
-    if (error) alert(error.message);
-    else alert("Added to Favorites ❤️");
-  }
+}) => {
+  const posterUrl = posterMap[trailer.id] || '/default-poster.jpg'
+  const releaseDate = trailer.category || 'Unknown Release'
 
   return (
-    <div className="rounded-lg overflow-hidden shadow-lg bg-gray-900 text-white">
+    <div className="bg-gray-800 rounded shadow hover:shadow-lg transition p-2 flex flex-col">
       <img
-        src={movie.poster_url}
-        alt={movie.title}
-        className="h-64 w-full object-cover"
+        src={posterUrl}
+        alt={trailer.title}
+        className="w-full h-48 object-cover rounded mb-2"
       />
-      <div className="p-3">
-        <h3 className="font-semibold text-lg">{movie.title}</h3>
-        <p className="text-sm text-gray-300">{movie.description}</p>
-        <p className="text-xs text-gray-400 mt-2">
-          Released {new Date(movie.release_date).toLocaleDateString()}
-        </p>
+      <h3 className="text-white font-semibold text-sm md:text-base">{trailer.title}</h3>
+      <p className="text-gray-400 text-xs">{releaseDate}</p>
 
-        {/* Add buttons */}
-        {!onRemoveFavorite && (
-          <div className="flex gap-2 mt-3">
-            <button
-              className="px-3 py-1 bg-purple-600 rounded hover:bg-purple-700 transition"
-              onClick={addToWatchlist}
-              disabled={loadingWatchlist}
-            >
-              {loadingWatchlist ? "Adding..." : "+ Watchlist"}
-            </button>
-            <button
-              className="px-3 py-1 bg-pink-600 rounded hover:bg-pink-700 transition"
-              onClick={addToFavorites}
-              disabled={loadingFavorite}
-            >
-              {loadingFavorite ? "Adding..." : "❤️ Favorite"}
-            </button>
-          </div>
-        )}
-
+      <div className="mt-2 flex gap-2 justify-center">
         {onRemoveFavorite && (
           <button
-            className="mt-2 text-red-500 hover:underline"
-            onClick={() => onRemoveFavorite(movie.id)}
+            className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onRemoveFavorite(trailer.id)
+            }}
           >
-            Remove from Favorites
+            Remove Favorite
           </button>
         )}
-
         {onRemoveWatchlist && (
           <button
-            className="mt-2 text-yellow-500 hover:underline"
-            onClick={() => onRemoveWatchlist(movie.id)}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded"
+            onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onRemoveWatchlist(trailer.id)
+            }}
           >
             Remove from Watchlist
           </button>
         )}
       </div>
     </div>
-  );
+  )
 }
+
+export default MovieCard
