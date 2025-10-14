@@ -1,4 +1,3 @@
-// src/components/MovieCard.tsx
 import React from 'react'
 
 // Import all posters
@@ -36,7 +35,9 @@ import id30 from '../assets/posters/id30.jpg'
 import type { Trailer } from '../lib/data'
 
 type MovieCardProps = {
-  trailer: Trailer
+  /** prefer using `movie`; `trailer` is kept for backward-compat */
+  movie?: Trailer
+  trailer?: Trailer
   userId?: string
   onRemoveFavorite?: (trailerId: string) => Promise<void>
   onRemoveWatchlist?: (trailerId: string) => Promise<void>
@@ -76,21 +77,25 @@ const posterMap: Record<string, string> = {
 }
 
 const MovieCard: React.FC<MovieCardProps> = ({
+  movie,
   trailer,
   onRemoveFavorite,
   onRemoveWatchlist,
 }) => {
-  const posterUrl = posterMap[trailer.id] || '/default-poster.jpg'
-  const releaseDate = trailer.category || 'Unknown Release'
+  const t = movie ?? trailer
+  if (!t) return null
+
+  const posterUrl = posterMap[t.id] || '/default-poster.jpg'
+  const releaseDate = t.category || 'Unknown Release'
 
   return (
     <div className="bg-gray-800 rounded shadow hover:shadow-lg transition p-2 flex flex-col">
       <img
         src={posterUrl}
-        alt={trailer.title}
+        alt={t.title}
         className="w-full h-48 object-cover rounded mb-2"
       />
-      <h3 className="text-white font-semibold text-sm md:text-base">{trailer.title}</h3>
+      <h3 className="text-white font-semibold text-sm md:text-base">{t.title}</h3>
       <p className="text-gray-400 text-xs">{releaseDate}</p>
 
       <div className="mt-2 flex gap-2 justify-center">
@@ -100,7 +105,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
             onClick={(e) => {
               e.stopPropagation()
               e.preventDefault()
-              onRemoveFavorite(trailer.id)
+              onRemoveFavorite(t.id)
             }}
           >
             Remove Favorite
@@ -112,7 +117,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
             onClick={(e) => {
               e.stopPropagation()
               e.preventDefault()
-              onRemoveWatchlist(trailer.id)
+              onRemoveWatchlist(t.id)
             }}
           >
             Remove from Watchlist

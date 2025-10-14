@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../hooks/useUser'
-import { toggleFavorite, toggleWatchlist, getTrailerById, fetchFavorites, fetchWatchlist, type Trailer } from '../lib/data'
+import {
+  toggleFavorite,
+  toggleWatchlist,
+  getTrailerById,
+  fetchFavorites,
+  fetchWatchlist,
+  type Trailer,
+} from '../lib/data'
 
 // Import all posters
 import poster1 from '../assets/posters/id1.jpg'
@@ -56,7 +63,7 @@ const moviesData: Movie[] = [
   { id: '9', title: '8 Femmes', poster: poster9, trailer: 'https://www.youtube.com/watch?v=8FemmesTrailer' },
   { id: '10', title: 'The Holy Mountain', poster: poster10, trailer: 'https://www.youtube.com/watch?v=TheHolyMountainTrailer' },
 
-  // Coming Soon (future releases)
+  // Coming Soon
   { id: '11', title: 'The Smashing Machine', poster: poster11, trailer: 'https://www.youtube.com/watch?v=TheSmashingMachineTrailer' },
   { id: '12', title: 'After the Hunt', poster: poster12, trailer: 'https://www.youtube.com/watch?v=AfterTheHuntTrailer' },
   { id: '13', title: 'Baaghi 4', poster: poster13, trailer: 'https://www.youtube.com/watch?v=Baaghi4Trailer' },
@@ -68,7 +75,7 @@ const moviesData: Movie[] = [
   { id: '19', title: 'Captain America: Brave New World', poster: poster19, trailer: 'https://www.youtube.com/watch?v=CaptainAmericaBraveNewWorldTrailer' },
   { id: '20', title: 'The Invisible Force', poster: poster20, trailer: 'https://www.youtube.com/watch?v=TheInvisibleForceTrailer' },
 
-  // New Releases (released within last 2 weeks)
+  // New Releases (last 2 weeks)
   { id: '21', title: 'Roofman', poster: poster21, trailer: 'https://www.youtube.com/watch?v=RoofmanTrailer' },
   { id: '22', title: 'Kambi Katna Kathai', poster: poster22, trailer: 'https://www.youtube.com/watch?v=KambiKatnaKathaiTrailer' },
   { id: '23', title: 'The Ballad of a Small Player', poster: poster23, trailer: 'https://www.youtube.com/watch?v=TheBalladOfASmallPlayerTrailer' },
@@ -81,7 +88,7 @@ const moviesData: Movie[] = [
   { id: '30', title: 'Bugonia', poster: poster30, trailer: 'https://www.youtube.com/watch?v=BugoniaTrailer' }
 ]
 
-// --- Helper for relative date strings ---
+// helper: relative date
 function relativeDate(from: Date): string {
   const now = new Date()
   const diffMs = now.getTime() - from.getTime()
@@ -96,7 +103,7 @@ function relativeDate(from: Date): string {
 
 // Assign release dates for Coming Soon (future: 2–6 weeks later)
 const comingSoonIndices = Array.from({ length: 10 }, (_, i) => 10 + i)
-const futureOffsets = [14, 21, 28, 35, 18, 24, 31, 42, 20, 38] // days from now
+const futureOffsets = [14, 21, 28, 35, 18, 24, 31, 42, 20, 38]
 comingSoonIndices.forEach((idx, i) => {
   const date = new Date()
   date.setDate(date.getDate() + futureOffsets[i])
@@ -105,7 +112,7 @@ comingSoonIndices.forEach((idx, i) => {
 
 // Assign release dates for New Releases (past 14 days)
 const newReleasesIndices = Array.from({ length: 10 }, (_, i) => 20 + i)
-const releaseOffsets = [2, 5, 1, 3, 7, 10, 4, 6, 12, 9] // days ago
+const releaseOffsets = [2, 5, 1, 3, 7, 10, 4, 6, 12, 9]
 newReleasesIndices.forEach((idx, i) => {
   const date = new Date()
   date.setDate(date.getDate() - releaseOffsets[i])
@@ -151,8 +158,8 @@ export default function Home() {
     setToastVisible(true)
     window.clearTimeout((showToast as any)._t1)
     window.clearTimeout((showToast as any)._t2)
-      ; (showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
-      ; (showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
+    ;(showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
+    ;(showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
   }
 
   return (
@@ -210,7 +217,10 @@ export default function Home() {
             }
             await toggleFavorite(user.id, trailer)
             showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
-          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert)
+          }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -229,9 +239,13 @@ export default function Home() {
             }
             await toggleWatchlist(user.id, trailer)
             showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
-          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert)
+          }
         }}
       />
+
       <Section
         title="Coming Soon"
         movies={moviesData.slice(10, 20)}
@@ -256,7 +270,10 @@ export default function Home() {
             }
             await toggleFavorite(user.id, trailer)
             showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
-          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert)
+          }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -265,12 +282,23 @@ export default function Home() {
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
           try {
-            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
             await toggleWatchlist(user.id, trailer)
             showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
-          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert)
+          }
         }}
       />
+
       <Section
         title="New Releases"
         movies={moviesData.slice(20, 30)}
@@ -284,10 +312,20 @@ export default function Home() {
           if (isFav) next.delete(id); else next.add(id)
           setFavoriteIds(next)
           try {
-            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
             await toggleFavorite(user.id, trailer)
             showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
-          } catch (e: any) { showToast(`Failed to update favorite: ${e?.message ?? 'error'}`); const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); isFav ? revert.add(id) : revert.delete(id); setFavoriteIds(revert)
+          }
         }}
         onWatchlist={async (id) => {
           if (!user) return showToast('Please sign in to manage watchlist')
@@ -296,10 +334,20 @@ export default function Home() {
           if (inList) next.delete(id); else next.add(id)
           setWatchlistIds(next)
           try {
-            const trailer: Trailer = getTrailerById(id) ?? { id, title: (moviesData.find(m => m.id === id)?.title ?? 'Unknown'), youtube_id: id, category: (moviesData.find(m => m.id === id)?.releaseDate ? 'Drama' : 'Unknown'), poster_url: (moviesData.find(m => m.id === id)?.poster ?? '') }
+            const movie = moviesData.find(m => m.id === id)
+            const trailer: Trailer = getTrailerById(id) ?? {
+              id,
+              title: movie?.title ?? 'Unknown',
+              youtube_id: movie ? extractYoutubeId(movie.trailer) : id,
+              category: movie ? (movie.releaseDate ? 'Drama' : 'Unknown') : 'Unknown',
+              poster_url: movie?.poster ?? ''
+            }
             await toggleWatchlist(user.id, trailer)
             showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
-          } catch (e: any) { showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`); const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert) }
+          } catch (e: any) {
+            showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
+            const revert = new Set(next); inList ? revert.add(id) : revert.delete(id); setWatchlistIds(revert)
+          }
         }}
       />
 
@@ -321,7 +369,7 @@ export default function Home() {
   )
 }
 
-// helper: extract youtube id from a full youtube watch url (very small extractor)
+// helper: extract youtube id
 function extractYoutubeId(url: string): string {
   try {
     const u = new URL(url)
@@ -333,7 +381,9 @@ function extractYoutubeId(url: string): string {
   }
 }
 
-function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, watchlistIds, onFavorite, onWatchlist }: {
+function Section({
+  title, movies, ctaLabel, onRemind, isRelative, favoriteIds, watchlistIds, onFavorite, onWatchlist
+}: {
   title: string;
   movies: Movie[];
   ctaLabel?: string;
@@ -427,8 +477,8 @@ function Section({ title, movies, ctaLabel, onRemind, isRelative, favoriteIds, w
                   <button style={{
                     width: '100%',
                     background: 'var(--color-button)', color: '#1c1530', border: 'none',
-                    cursor: 'pointer',           // <-- makes the cursor a hand
-                    transition: 'background 0.2s', // optional smooth hover
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
                     borderRadius: 'var(--radius-sm)', padding: '0.5rem 0', fontWeight: 600
                   }} onClick={() => onRemind && onRemind(dateStr!)}>{ctaLabel}</button>
                 </div>
