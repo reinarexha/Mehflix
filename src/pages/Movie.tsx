@@ -20,8 +20,12 @@ export default function Movie() {
       try {
         const rows = await fetchComments(videoId)
         setComments(rows)
-      } catch {}
+      } catch (e) {
+        // ignore load errors for now
+        console.warn('Failed to load comments', e)
+      }
     }
+
     run()
   }, [videoId])
 
@@ -42,23 +46,137 @@ export default function Movie() {
   }, [user, videoId])
 
   // Local comment helpers (supabase-backed)
-  async function fetchComments(trailerId: string): Promise<CommentRow[]> {
-    const { data, error } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('trailer_id', trailerId.toString())
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    return (data ?? []) as CommentRow[]
+  // Resolve trailer id candidates (prefer canonical trailer.id when available)
+  function trailerIdCandidates(videoIdentifier: string) {
+    const trailer = getTrailerById(videoIdentifier)
+    const candidates = [] as string[]
+    if (trailer?.id) candidates.push(trailer.id)
+    if (videoIdentifier) candidates.push(videoIdentifier)
+    // dedupe
+    return Array.from(new Set(candidates))
   }
 
-  async function addComment(userId: string, trailerId: string, content: string) {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert([{ user_id: userId, trailer_id: trailerId, content }])
-      .select()
-    if (error) throw error
-    return data?.[0]
+  async function fetchComments(trailerIdentifier: string): Promise<CommentRow[]> {
+    // include commenter username; query by any known trailer id form (uuid or youtube id)
+    const ids = trailerIdCandidates(trailerIdentifier)
+    try {
+      // try fetching by trailer_id
+      let byTrailer: any[] | null = null
+      let errTrailer: any = null
+      try {
+        const res = await supabase
+          .from('comments')
+          .select('id, user_id, trailer_id, content, created_at, likes, commenter:profiles(username)')
+          .in('trailer_id', ids)
+          .order('created_at', { ascending: false })
+        byTrailer = res.data ?? null
+        errTrailer = res.error ?? null
+      } catch (e) {
+        errTrailer = e
+      }
+
+      // also try fetching by movie_id in case the schema uses that column
+      let byMovie: any[] | null = null
+      let errMovie: any = null
+      try {
+        const res2 = await supabase
+          .from('comments')
+          .select('id, user_id, trailer_id, movie_id, content, created_at, likes, commenter:profiles(username)')
+          .in('movie_id', ids)
+          .order('created_at', { ascending: false })
+        byMovie = res2.data ?? null
+        errMovie = res2.error ?? null
+      } catch (e) {
+        errMovie = e
+      }
+
+      // If both attempts returned relationship errors, fallback to no-join flow
+      const relErrMsg = 'Could not find a relationship'
+      const trailerRelErr = errTrailer && String(errTrailer.message || errTrailer).includes(relErrMsg)
+      const movieRelErr = errMovie && String(errMovie.message || errMovie).includes(relErrMsg)
+
+      let rows: any[] = []
+      if ((errTrailer && !trailerRelErr) || (errMovie && !movieRelErr)) {
+        // Some other error occurred
+        throw errTrailer || errMovie
+      }
+
+      if (trailerRelErr || movieRelErr) {
+        // fallback: fetch comments without join and then fetch profiles separately
+        const { data: simpleByTrailer, error: sErr1 } = await supabase
+          .from('comments')
+          .select('id, user_id, trailer_id, movie_id, content, created_at, likes')
+          .in('trailer_id', ids)
+          .order('created_at', { ascending: false })
+        const { data: simpleByMovie, error: sErr2 } = await supabase
+          .from('comments')
+          .select('id, user_id, trailer_id, movie_id, content, created_at, likes')
+          .in('movie_id', ids)
+          .order('created_at', { ascending: false })
+        if (sErr1 && sErr2) throw sErr1 || sErr2
+        rows = [...(simpleByTrailer ?? []), ...(simpleByMovie ?? [])]
+        // fetch usernames for unique user_ids
+        const uids = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)))
+        if (uids.length) {
+          const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', uids)
+          const mapProfiles = new Map((profiles ?? []).map((p: any) => [p.id, p.username]))
+          return rows.map(r => ({ ...r, commenterUsername: mapProfiles.get(r.user_id) ?? null })) as CommentRow[]
+        }
+        return rows.map(r => ({ ...r, commenterUsername: null })) as CommentRow[]
+      }
+
+      rows = [...(byTrailer ?? []), ...(byMovie ?? [])] as any[]
+      // dedupe by id
+      const map = new Map<string, any>()
+      for (const r of rows) map.set(r.id, r)
+      const merged = Array.from(map.values())
+      return merged.map(r => ({ ...r, commenterUsername: Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null) })) as CommentRow[]
+    } catch (error) {
+      throw error
+    }
+  }
+
+  async function addComment(userId: string, trailerIdentifier: string, content: string) {
+    // prefer canonical trailer.id when available
+    const candidates = trailerIdCandidates(trailerIdentifier)
+    const preferred = candidates[0]
+    // First try inserting into trailer_id column; if that fails (schema uses movie_id), try movie_id
+    const tryInsert = async (payload: any) => {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([payload])
+        .select('id, user_id, trailer_id, movie_id, content, created_at, likes, commenter:profiles(username)')
+      return { data, error }
+    }
+
+    // attempt with trailer_id
+    let res = await tryInsert({ user_id: userId, trailer_id: preferred, content })
+    // If the DB reports missing trailer_id column, try movie_id fallback
+    const missingTrailerId = res.error && String(res.error.message || res.error).includes("trailer_id")
+    if (res.error && missingTrailerId) {
+      const fb = await tryInsert({ user_id: userId, movie_id: preferred, content })
+      if (!fb.error) res = fb
+      else {
+        // both failed, combine messages
+        const combined = `${String(res.error.message || res.error)}; ${String(fb.error.message || fb.error)}`
+        console.warn('addComment failed (both attempts):', combined)
+        throw new Error(combined)
+      }
+    } else if (res.error) {
+      // Other error not related to missing column — try fallback anyway but keep primary error if fallback fails
+      const fb = await tryInsert({ user_id: userId, movie_id: preferred, content })
+      if (!fb.error) res = fb
+      else {
+        const combined = `${String(res.error.message || res.error)}; ${String(fb.error.message || fb.error)}`
+        console.warn('addComment failed (both attempts):', combined)
+        throw new Error(combined)
+      }
+    }
+
+    const r = res.data?.[0]
+    if (!r) return null
+    const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+    return { ...r, commenterUsername }
   }
 
   async function toggleLikeComment(commentId: string) {
@@ -127,7 +245,7 @@ export default function Movie() {
               const optimistic: CommentRow = {
                 id: `temp-${Date.now()}`,
                 user_id: user.id,
-                trailer_id: videoId,
+                trailer_id: (getTrailerById(videoId)?.id ?? videoId),
                 content,
                 created_at: new Date().toISOString(),
                 likes: 0,
@@ -135,12 +253,20 @@ export default function Movie() {
               setComments(prev => [optimistic, ...prev])
               setNewComment('')
               try {
-                await addComment(user.id, videoId, content)
-                const rows = await fetchComments(videoId)
-                setComments(rows)
-              } catch {
-                // rollback
-                setComments(prev => prev.filter(c => c.id !== optimistic.id))
+                const saved = await addComment(user.id, videoId, content)
+                if (saved) {
+                  // Replace optimistic comment with persisted server row
+                  setComments(prev => [
+                    saved,
+                    ...prev.filter(c => !c.id.toString().startsWith('temp-'))
+                  ])
+                } else {
+                  // mark unsynced (no id)
+                  setComments(prev => prev.map(c => c.id === optimistic.id ? { ...c, _unsynced: true, _error: 'Failed to save' } : c))
+                }
+              } catch (err: any) {
+                // mark unsynced and keep optimistic visible with retry
+                setComments(prev => prev.map(c => c.id === optimistic.id ? { ...c, _unsynced: true, _error: err?.message ?? 'Failed to save' } : c))
               }
             }}>
               <input value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment" className="flex-1 px-3 py-2 rounded-sm border border-white/10 bg-input text-text" />
@@ -149,14 +275,47 @@ export default function Movie() {
             <div className="space-y-3">
               {comments.map(c => (
                 <div key={c.id} className="bg-surface border border-white/10 rounded-md p-3">
-                  <div className="text-sm text-muted mb-1">{new Date(c.created_at).toLocaleString()}</div>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-sm font-semibold">{(c as any).commenterUsername ?? c.user_id}</div>
+                      <div className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</div>
+                    </div>
+                    <div className="text-sm text-gray-400">Likes: {c.likes ?? 0}</div>
+                  </div>
                   <div className="mb-2">{c.content}</div>
-                  <button onClick={async () => {
-                    if (!user) return alert('Please sign in to like comments')
-                    // optimistic count
-                    setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: (x.likes ?? 0) + 1 } : x))
-                    try { await toggleLikeComment(c.id) } catch { setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x)) }
-                  }} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Like ({c.likes ?? 0})</button>
+                  { (c as any)._unsynced && (
+                    <div className="mt-2 text-sm text-yellow-300 flex items-center justify-between">
+                      <div>Not saved: {(c as any)._error}</div>
+                      <div>
+                        <button onClick={async () => {
+                          // retry saving this optimistic comment
+                          try {
+                            const { data, error } = await supabase
+                              .from('comments')
+                              .insert([{ trailer_id: c.trailer_id, user_id: c.user_id, content: c.content }])
+                              .select('id, user_id, trailer_id, content, created_at, likes, commenter:profiles(username)')
+                            if (!error && data) {
+                              const r = data[0]
+                              const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+                              setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(x => x.id !== c.id) ])
+                            } else {
+                              setComments(prev => prev.map(x => x.id === c.id ? { ...x, _unsynced: true, _error: error?.message ?? 'Failed to save' } : x))
+                            }
+                          } catch (err:any) {
+                            setComments(prev => prev.map(x => x.id === c.id ? { ...x, _unsynced: true, _error: err?.message ?? 'Failed to save' } : x))
+                          }
+                        }} className="text-xs underline">Retry</button>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <button onClick={async () => {
+                      if (!user) return alert('Please sign in to like comments')
+                      // optimistic count
+                      setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: (x.likes ?? 0) + 1 } : x))
+                      try { await toggleLikeComment(c.id) } catch { setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x)) }
+                    }} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Like</button>
+                  </div>
                 </div>
               ))}
             </div>

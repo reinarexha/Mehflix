@@ -1,20 +1,148 @@
 // src/pages/Profile.tsx
 import { useEffect, useState } from 'react'
 import { useUser } from '../hooks/useUser'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
+import { getTrailerById } from '../lib/data'
 
 const Profile: React.FC = () => {
   const { user } = useUser()
   const [username, setUsername] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifLoading, setNotifLoading] = useState(false)
+  const navigate = useNavigate()
+
+  // Fetch latest profile data
+  const fetchProfile = async () => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.log('Error fetching profile:', error.message)
+      }
+
+      if (profileData && (profileData as any).username) {
+        setUsername((profileData as any).username)
+      } else {
+        // Fallback to auth metadata
+        try {
+          const { data: authData } = await supabase.auth.getUser()
+          const authUser = authData.user
+          const meta = (authUser as any)?.user_metadata
+          setUsername(meta?.username || null)
+        } catch (e) {
+          setUsername(null)
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (user) {
-      const meta = (user as any).user_metadata
-      setUsername(meta?.username || null)
+    fetchProfile()
+    const onProfileUpdated = (e: any) => {
+      if (e?.detail?.username) setUsername(e.detail.username)
+      else fetchProfile()
     }
-    setLoading(false)
+    const onAuthRefreshed = () => {
+      // auth metadata might have changed (username stored in auth user metadata)
+      fetchProfile()
+    }
+
+    window.addEventListener('profile:updated', onProfileUpdated)
+    window.addEventListener('auth:refreshed', onAuthRefreshed)
+
+    return () => {
+      window.removeEventListener('profile:updated', onProfileUpdated)
+      window.removeEventListener('auth:refreshed', onAuthRefreshed)
+    }
   }, [user])
+
+  // Notifications: who liked my comments
+  useEffect(() => {
+    if (!user) {
+      setNotifications([])
+      return
+    }
+
+    let mounted = true
+    async function loadNotifications() {
+      setNotifLoading(true)
+      try {
+        // 1) fetch my comments
+  const userId = user!.id
+        const { data: myComments } = await supabase
+          .from('comments')
+          .select('id, content, trailer_id')
+          .eq('user_id', userId)
+
+        const commentRows = (myComments ?? []) as any[]
+        const ids = commentRows.map(c => c.id)
+        if (ids.length === 0) {
+          if (mounted) setNotifications([])
+          return
+        }
+
+        // 2) fetch likes on those comments, include liker profile if available
+        const { data: likes } = await supabase
+          .from('comment_likes')
+          .select('id, user_id, comment_id, created_at, liker:profiles(username)')
+          .in('comment_id', ids)
+          .order('created_at', { ascending: false })
+
+        const likesRows = (likes ?? []) as any[]
+
+        const mapByComment: Record<string, any> = {}
+        for (const c of commentRows) mapByComment[c.id] = c
+
+        const items = likesRows.map(l => {
+          const comment = mapByComment[l.comment_id]
+          const likerName = (l.liker && l.liker.username) || l.user_id
+          const trailerId = comment?.trailer_id || null
+          const trailer = trailerId ? getTrailerById(trailerId) : undefined
+          const movieLink = trailer ? `/movie/${trailer.youtube_id ?? trailer.id}` : `/movie/${trailerId}`
+          return {
+            id: l.id,
+            likerName,
+            commentContent: comment?.content || '',
+            created_at: l.created_at,
+            movieLink,
+          }
+        })
+
+        if (mounted) setNotifications(items)
+      } catch (e) {
+        console.warn('Failed to load notifications', e)
+      } finally {
+        if (mounted) setNotifLoading(false)
+      }
+    }
+
+    loadNotifications()
+
+    return () => { mounted = false }
+  }, [user])
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.warn('Sign out failed', e)
+    }
+    // Navigate to login and rely on ProtectedRoute to block other pages
+    navigate('/login')
+  }
 
   if (loading)
     return <div className="text-white text-center mt-20">Loading profile...</div>
@@ -29,7 +157,12 @@ const Profile: React.FC = () => {
       </div>
     )
 
-  const initials = (username || user.email || 'U').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase()
+  const initials = (username || user.email || 'U')
+    .split(' ')
+    .map(s => s[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   return (
     <div className="min-h-screen bg-gray-900 p-6 flex justify-center">
@@ -41,33 +174,78 @@ const Profile: React.FC = () => {
               {initials}
             </div>
             <h2 className="text-xl font-bold">{username || user.email}</h2>
-            <p className="text-gray-300 mt-1">{user.email}</p>
             <div className="mt-4 flex flex-col gap-2 w-full">
-              <Link to="/edit-info" className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md">Edit Info</Link>
-              <Link to="/change-password" className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md">Change Password</Link>
+              <Link
+                to="/edit-info"
+                className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md"
+              >
+                Edit Info
+              </Link>
+              <div className="flex gap-2">
+                <button
+                  onClick={fetchProfile}
+                  className="text-center bg-blue-600 hover:bg-blue-700 mt-2 px-3 py-1 rounded"
+                >
+                  Refresh Profile
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-center bg-red-600 hover:bg-red-700 mt-2 px-3 py-1 rounded"
+                >
+                  Log out
+                </button>
+              </div>
+            </div>
+            {/* My Activity: moved under avatar/buttons */}
+            <div className="w-full mt-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-center">My Activity</h3>
+                <div className="flex justify-center gap-6">
+                  <Link to="/watchlist" className="bg-gray-800 rounded-md p-3 flex flex-col items-center w-28">
+                    {/* clock icon */}
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mb-1">
+                      <path d="M12 1.75a10.25 10.25 0 1 0 0 20.5 10.25 10.25 0 0 0 0-20.5Zm0 18.5A8.25 8.25 0 1 1 12 3.75a8.25 8.25 0 0 1 0 16.5Zm.75-13.5h-1.5v6l5 3 .75-1.23-4.25-2.52V6.75Z" />
+                    </svg>
+                    <div className="text-xs text-gray-300">Watchlist</div>
+                  </Link>
+                  <Link to="/favorites" className="bg-gray-800 rounded-md p-3 flex flex-col items-center w-28">
+                    {/* star icon */}
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mb-1">
+                      <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27Z" />
+                    </svg>
+                    <div className="text-xs text-gray-300">Favorites</div>
+                  </Link>
+                </div>
+              </div>
+            </div>
+            {/* Notifications: who liked my comments */}
+            <div className="w-full mt-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-center">Notifications</h3>
+                {notifLoading ? (
+                  <div className="text-center text-sm text-gray-300">Loading...</div>
+                ) : notifications.length === 0 ? (
+                  <div className="text-center text-sm text-gray-300">No notifications yet</div>
+                ) : (
+                  <ul className="space-y-2 text-sm">
+                    {notifications.map((n) => (
+                      <li key={n.id} className="p-2 bg-gray-800 rounded flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="text-gray-200"><strong>{n.likerName}</strong> liked your comment</div>
+                          <div className="text-xs text-gray-400 truncate">"{n.commentContent}"</div>
+                          <a href={n.movieLink} className="text-xs text-blue-400 mt-1 inline-block">View</a>
+                        </div>
+                        <div className="text-xs text-gray-500 ml-3">{new Date(n.created_at).toLocaleString()}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Middle: stats & quick links */}
-          <div className="md:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-3">My Activity</h3>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <Link to="/watchlist" className="bg-gray-800 rounded-md p-3">
-                  <div className="text-xl font-bold">—</div>
-                  <div className="text-xs text-gray-300">Watchlist</div>
-                </Link>
-                <Link to="/favorites" className="bg-gray-800 rounded-md p-3">
-                  <div className="text-xl font-bold">—</div>
-                  <div className="text-xs text-gray-300">Favorites</div>
-                </Link>
-                <Link to="/ratings" className="bg-gray-800 rounded-md p-3">
-                  <div className="text-xl font-bold">—</div>
-                  <div className="text-xs text-gray-300">Ratings</div>
-                </Link>
-              </div>
-            </div>
-
+          {/* Right: Personal Info */}
+          <div className="md:col-span-2">
             <div className="bg-gray-700 rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-3">Personal Info</h3>
               <div className="text-sm text-gray-300 space-y-2">

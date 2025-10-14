@@ -41,7 +41,22 @@ export const UserProvider = ({ children }: Props) => {
       }
     );
 
-    return () => listener.subscription.unsubscribe();
+    const onAuthRefreshed = async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        setSession(data.session)
+        setUser(data.session?.user ?? null)
+      } catch (e) {
+        console.warn('Failed to refresh auth session', e)
+      }
+    }
+
+    window.addEventListener('auth:refreshed', onAuthRefreshed)
+
+    return () => {
+      listener.subscription.unsubscribe();
+      window.removeEventListener('auth:refreshed', onAuthRefreshed)
+    };
   }, []);
 
   return (

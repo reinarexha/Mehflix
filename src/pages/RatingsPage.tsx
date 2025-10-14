@@ -17,11 +17,12 @@ export default function RatingsPage({ userId }: Props) {
         .eq("user_id", userId);
 
       if (error) {
-        alert(error.message);
+        console.warn('Failed to load ratings:', error.message);
+        setRatings([]);
         return;
       }
 
-      setRatings(data);
+      setRatings(data || []);
     }
 
     loadRatings();
