@@ -33,7 +33,11 @@ export default function CommentSection({ movieId, userId }: Props) {
         if (!res.error && res.data) {
           const rows = (res.data as any[]).map((r) => ({
             ...r,
-            commenterUsername: Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+            commenterUsername: (function getName(x:any){
+              if (!x) return null
+              if (Array.isArray(x)) return x[0]?.username ?? null
+              return x.username ?? null
+            })(r.commenter)
           }))
           setComments(rows as Comment[])
           return
@@ -94,7 +98,7 @@ export default function CommentSection({ movieId, userId }: Props) {
           .select('id, trailer_id, movie_id, user_id, content, created_at, likes, commenter:profiles(username)')
         if (!fbErr && fbData) {
           const r = fbData[0]
-          const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+          const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
           setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => !c.id.toString().startsWith('temp-')) ])
           setNewComment("")
           return true
@@ -105,7 +109,7 @@ export default function CommentSection({ movieId, userId }: Props) {
 
       if (!error && data) {
         const r = data[0]
-        const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+        const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
         // Replace optimistic with real row
         setComments(prev => [
           { ...r, commenterUsername },
@@ -144,7 +148,7 @@ export default function CommentSection({ movieId, userId }: Props) {
           .select('id, trailer_id, movie_id, user_id, content, created_at, likes, commenter:profiles(username)')
         if (!fbErr && fbData) {
           const r = fbData[0]
-          const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+          const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
           setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => c.id !== comment.id) ])
           return
         }
@@ -154,7 +158,7 @@ export default function CommentSection({ movieId, userId }: Props) {
 
       if (!error && data) {
         const r = data[0]
-        const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+        const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
         setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => c.id !== comment.id) ])
       } else {
         setComments(prev => prev.map(c => c.id === comment.id ? { ...c, _unsynced: true, _error: error?.message ?? 'Failed to save' } : c))

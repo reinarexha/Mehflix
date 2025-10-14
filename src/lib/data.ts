@@ -25,8 +25,8 @@ export async function getMovieById(id: string): Promise<Trailer | null> {
    If you later mirror your posters in DB, you can implement this to look up a cached map.
    For now it intentionally returns null so Home.tsx’s fallback object is used.
 */
-export function getTrailerById(_id: string): Trailer | null {
-  return null;
+export function getTrailerById(_id: string): Trailer | undefined {
+  return undefined;
 }
 
 /* ========= Watchlist ========= */
@@ -218,3 +218,15 @@ export async function toggleLikeComment(userId: string, commentId: string) {
 
 // sanity marker if you want to check via console dynamic import
 export const __DATA_MODULE = "OK";
+
+// Remove a specific watchlist row by its row id
+export async function removeWatchlistRow(rowId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('watchlist').delete().eq('id', rowId)
+    if (error) throw error
+    return true
+  } catch (err) {
+    console.warn('removeWatchlistRow failed', err)
+    throw err
+  }
+}

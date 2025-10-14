@@ -24,7 +24,7 @@ export default function EditInfo(_props: Props) {
         return;
       }
 
-      setEmail(user.email);
+  setEmail(user.email ?? "");
 
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")

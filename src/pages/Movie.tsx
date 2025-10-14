@@ -130,7 +130,7 @@ export default function Movie() {
       const map = new Map<string, any>()
       for (const r of rows) map.set(r.id, r)
       const merged = Array.from(map.values())
-      return merged.map(r => ({ ...r, commenterUsername: Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null) })) as CommentRow[]
+  return merged.map(r => ({ ...r, commenterUsername: (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter) })) as CommentRow[]
     } catch (error) {
       throw error
     }
@@ -173,10 +173,10 @@ export default function Movie() {
       }
     }
 
-    const r = res.data?.[0]
-    if (!r) return null
-    const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
-    return { ...r, commenterUsername }
+  const r = res.data?.[0]
+  if (!r) return null
+  const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
+  return { ...r, commenterUsername }
   }
 
   async function toggleLikeComment(commentId: string) {
@@ -296,7 +296,7 @@ export default function Movie() {
                               .select('id, user_id, trailer_id, content, created_at, likes, commenter:profiles(username)')
                             if (!error && data) {
                               const r = data[0]
-                              const commenterUsername = Array.isArray(r.commenter) ? (r.commenter[0]?.username ?? null) : (r.commenter?.username ?? null)
+                              const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
                               setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(x => x.id !== c.id) ])
                             } else {
                               setComments(prev => prev.map(x => x.id === c.id ? { ...x, _unsynced: true, _error: error?.message ?? 'Failed to save' } : x))
