@@ -1,190 +1,190 @@
 import { useEffect, useState } from "react";
+import { useUser } from "../hooks/useUser";
 import { supabase } from "../lib/supabaseClient";
+import { toggleLikeComment } from "../lib/data";
+
+type Profile = { username: string };
+type Movie = { title: string };
 
 type Comment = {
   id: string;
-  trailer_id: string;
+  movie_id?: string | null;
   user_id: string;
   content: string;
   created_at: string;
-  updated_at?: string | null;
   likes?: number;
+  commenter?: Profile[]; // Supabase returns array for joins
+  movie?: Movie[];
   commenterUsername?: string | null;
+  movieTitle?: string | null;
   _unsynced?: boolean;
   _error?: string | null;
 };
 
-type Props = { movieId: string; userId: string };
+type Props = { movieId: string; userId?: string | null };
 
 export default function CommentSection({ movieId, userId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const { user } = useUser()
+  // Prefer the authenticated user's id from context but allow an override prop
+  const resolvedUserId = userId ?? user?.id ?? null
 
-  // 1️⃣ Fetch comments
+  // Load the signed-in user's profile username so optimistic comments show the username
   useEffect(() => {
-    async function loadComments() {
-      // Try join; if relationship missing, fallback to no-join and map usernames
+    let mounted = true;
+    async function loadUsername() {
+      if (!resolvedUserId) {
+        setCurrentUsername(null);
+        return;
+      }
       try {
-        const res = await supabase
-          .from('comments')
-          .select('id, movie_id, user_id, content, created_at, commenter:profiles(username)')
-          .eq('movie_id', movieId)
-          .order('created_at', { ascending: true })
-        if (!res.error && res.data) {
-          const rows = (res.data as any[]).map((r) => ({
-            ...r,
-            commenterUsername: (function getName(x:any){
-              if (!x) return null
-              if (Array.isArray(x)) return x[0]?.username ?? null
-              return x.username ?? null
-            })(r.commenter)
-          }))
-          setComments(rows as Comment[])
-          return
-        }
-
-        const relErrMsg = 'Could not find a relationship'
-        if (res.error && String(res.error.message || res.error).includes(relErrMsg)) {
-          // fallback: fetch comments without join and then fetch usernames
-          const { data: rowsData, error: rowsErr } = await supabase
-            .from('comments')
-            .select('id, movie_id, user_id, content, created_at, likes')
-            .eq('movie_id', movieId)
-            .order('created_at', { ascending: true })
-          if (rowsErr) throw rowsErr
-          const rows = (rowsData ?? []) as any[]
-          const uids = Array.from(new Set(rows.map(r => r.user_id).filter(Boolean)))
-          let profilesMap = new Map()
-          if (uids.length) {
-            const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', uids)
-            profilesMap = new Map((profiles ?? []).map((p: any) => [p.id, p.username]))
-          }
-          setComments(rows.map(r => ({ ...r, commenterUsername: profilesMap.get(r.user_id) ?? null })) as Comment[])
-          return
-        }
+        const { data, error } = await supabase.from('profiles').select('username').eq('id', resolvedUserId).single();
+        if (!mounted) return;
+        if (!error && data) setCurrentUsername(data.username ?? null);
       } catch (e) {
-        console.warn('Failed to load comments', e)
+        console.warn('Failed to load current username', e);
       }
     }
+    loadUsername();
+    return () => {
+      mounted = false;
+    };
+  }, [resolvedUserId]);
+
+  useEffect(() => {
+    async function loadComments() {
+      try {
+        const { data, error } = await supabase
+          .from("comments")
+          .select(`
+            id,
+            movie_id,
+            user_id,
+            content,
+            created_at,
+            likes,
+            commenter:profiles(username),
+            movie:movies(title)
+          `)
+          .eq("movie_id", movieId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        // Supabase returns joined rows as arrays; TypeScript can infer 'never' for empty [] literals
+        // Cast the incoming rows to `any` for safe mapping of joined fields like commenter and movie
+        // Keep commenterUsername null when join didn't return a username so we can fetch missing ones
+        const mapped = ((data || []) as any[]).map((c: any) => ({
+          ...c,
+          commenterUsername: Array.isArray(c.commenter)
+            ? c.commenter[0]?.username ?? null
+            : c.commenter?.[0]?.username ?? null,
+          movieTitle: Array.isArray(c.movie)
+            ? c.movie[0]?.title ?? "Unknown Movie"
+            : c.movie?.[0]?.title ?? "Unknown Movie",
+        }));
+
+        setComments(mapped);
+        // If some rows lacked commenterUsername (join may have failed), fetch profiles separately
+        const missingUserIds = Array.from(
+          new Set(
+            mapped
+              .map((r) => (r.commenterUsername ? null : r.user_id))
+              .filter(Boolean) as string[]
+          )
+        );
+        if (missingUserIds.length) {
+          try {
+            const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', missingUserIds);
+            const mapProfiles = new Map((profiles ?? []).map((p: any) => [p.id, p.username]));
+            setComments((prev) => prev.map((r) => ({ ...r, commenterUsername: r.commenterUsername ?? mapProfiles.get(r.user_id) ?? r.user_id })));
+          } catch (e) {
+            // ignore profile fetch errors; we'll keep the user_id fallback
+            console.warn('Failed to load missing profile usernames', e);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load comments:", e);
+      }
+    }
+
     loadComments();
   }, [movieId]);
 
-  // 2️⃣ Add a new comment
   async function addComment() {
-    if (!newComment) return;
-    // optimistic comment (string id so it can be filtered later)
+    if (!newComment || !resolvedUserId) return;
+
     const optimistic: Comment = {
       id: `temp-${Date.now()}`,
-      trailer_id: movieId,
-      user_id: userId,
+      movie_id: movieId,
+      user_id: resolvedUserId as string,
       content: newComment,
       created_at: new Date().toISOString(),
-      commenterUsername: null,
       likes: 0,
-    }
-    setComments(prev => [optimistic, ...prev])
+      // only set the username if we have it; render will prefix with @ when present
+      commenterUsername: currentUsername ?? null,
+      movieTitle: null,
+      _unsynced: false,
+    };
+    setComments((prev) => [optimistic, ...prev]);
+    setNewComment("");
 
-    const attempt = async () => {
+    try {
       const { data, error } = await supabase
         .from("comments")
-        .insert([{ trailer_id: movieId, user_id: userId, content: newComment }])
-        .select('id, trailer_id, user_id, content, created_at, likes, commenter:profiles(username)');
+        .insert([{ movie_id: movieId, user_id: resolvedUserId, content: optimistic.content }])
+        .select(`
+          id,
+          movie_id,
+          user_id,
+          content,
+          created_at,
+          likes,
+          commenter:profiles(username),
+          movie:movies(title)
+        `);
 
-      // if trailer_id column missing, try movie_id fallback
-      if (error && String(error.message || error).includes('trailer_id')) {
-        const { data: fbData, error: fbErr } = await supabase
-          .from('comments')
-          .insert([{ movie_id: movieId, user_id: userId, content: newComment }])
-          .select('id, trailer_id, movie_id, user_id, content, created_at, likes, commenter:profiles(username)')
-        if (!fbErr && fbData) {
-          const r = fbData[0]
-          const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
-          setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => !c.id.toString().startsWith('temp-')) ])
-          setNewComment("")
-          return true
-        }
-        setComments(prev => prev.map(c => c.id === optimistic.id ? { ...c, _unsynced: true, _error: (fbErr?.message ?? error?.message ?? 'Failed to save') } : c))
-        return false
+      if (error || !data || !data.length) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === optimistic.id ? { ...c, _unsynced: true, _error: error?.message ?? "Failed to save" } : c
+          )
+        );
+        return;
       }
 
-      if (!error && data) {
-        const r = data[0]
-        const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
-        // Replace optimistic with real row
-        setComments(prev => [
-          { ...r, commenterUsername },
-          ...prev.filter(c => !c.id.toString().startsWith('temp-'))
-        ])
-        setNewComment("");
-        return true
-      }
-
-      // mark optimistic as unsynced with error
-      setComments(prev => prev.map(c => c.id === optimistic.id ? { ...c, _unsynced: true, _error: error?.message ?? 'Failed to save' } : c))
-      return false
-    }
-
-    try {
-      await attempt()
-    } catch (e:any) {
-      // mark unsynced and show error
-      setComments(prev => prev.map(c => c.id === optimistic.id ? { ...c, _unsynced: true, _error: e?.message ?? 'Failed to save' } : c))
-    }
-  }
-
-  // Retry saving an optimistic comment
-  async function retrySaveComment(comment: Comment) {
-    // clear error while retrying
-    setComments(prev => prev.map(c => c.id === comment.id ? { ...c, _unsynced: false, _error: null } : c))
-    try {
-      const { data, error } = await supabase
-        .from('comments')
-        .insert([{ trailer_id: comment.trailer_id, user_id: comment.user_id, content: comment.content }])
-        .select('id, trailer_id, user_id, content, created_at, likes, commenter:profiles(username)')
-      if (error && String(error.message || error).includes('trailer_id')) {
-        const { data: fbData, error: fbErr } = await supabase
-          .from('comments')
-          .insert([{ movie_id: comment.trailer_id, user_id: comment.user_id, content: comment.content }])
-          .select('id, trailer_id, movie_id, user_id, content, created_at, likes, commenter:profiles(username)')
-        if (!fbErr && fbData) {
-          const r = fbData[0]
-          const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
-          setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => c.id !== comment.id) ])
-          return
-        }
-        setComments(prev => prev.map(c => c.id === comment.id ? { ...c, _unsynced: true, _error: (fbErr?.message ?? error?.message ?? 'Failed to save') } : c))
-        return
-      }
-
-      if (!error && data) {
-        const r = data[0]
-        const commenterUsername = (function getName(x:any){ if (!x) return null; if (Array.isArray(x)) return x[0]?.username ?? null; return x.username ?? null })(r.commenter)
-        setComments(prev => [ { ...r, commenterUsername }, ...prev.filter(c => c.id !== comment.id) ])
-      } else {
-        setComments(prev => prev.map(c => c.id === comment.id ? { ...c, _unsynced: true, _error: error?.message ?? 'Failed to save' } : c))
-      }
-    } catch (e:any) {
-      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, _unsynced: true, _error: e?.message ?? 'Failed to save' } : c))
-    }
-  }
-
-  // 3️⃣ Delete a comment
-  async function deleteComment(id: string) {
-    const { error } = await supabase.from("comments").delete().eq("id", id);
-    if (!error) setComments(comments.filter((c) => c.id !== id));
-  }
-
-  // 4️⃣ Update a comment
-  async function updateComment(id: string, content: string) {
-    const { data, error } = await supabase
-      .from("comments")
-      .update({ content, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .select();
-    if (!error && data) {
-      setComments(
-        comments.map((c) => (c.id === id ? { ...c, content: data[0].content } : c))
+      const c = (data as any[])[0];
+      setComments((prev) => [
+        {
+          ...c,
+          commenterUsername: Array.isArray(c.commenter)
+            ? c.commenter[0]?.username ?? null
+            : c.commenter?.[0]?.username ?? null,
+          movieTitle: Array.isArray(c.movie)
+            ? c.movie[0]?.title ?? "Unknown Movie"
+            : c.movie?.[0]?.title ?? "Unknown Movie",
+        },
+        ...prev.filter((p) => !p.id.toString().startsWith("temp-")),
+      ]);
+    } catch (e: any) {
+      setComments((prev) =>
+        prev.map((c) => (c.id === optimistic.id ? { ...c, _unsynced: true, _error: e.message ?? "Failed to save" } : c))
       );
+    }
+  }
+
+  async function toggleLike(comment: Comment) {
+    if (!resolvedUserId) return alert("Please sign in to like comments");
+    setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, likes: (c.likes ?? 0) + 1 } : c)));
+    try {
+      const res = await toggleLikeComment(resolvedUserId, comment.id);
+      if (!res || res.liked === false) {
+        setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, likes: Math.max(0, (c.likes ?? 1) - 1) } : c)));
+      }
+    } catch {
+      setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, likes: Math.max(0, (c.likes ?? 1) - 1) } : c)));
     }
   }
 
@@ -194,7 +194,6 @@ export default function CommentSection({ movieId, userId }: Props) {
 
       <div className="flex gap-2 mb-3">
         <input
-          type="text"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Add a comment..."
@@ -205,44 +204,26 @@ export default function CommentSection({ movieId, userId }: Props) {
         </button>
       </div>
 
-      {comments.map((c) => (
-        <div key={c.id} className="border-b border-gray-600 py-2">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="text-sm font-semibold text-white">{c.commenterUsername ?? c.user_id}</div>
-              <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
+      <div className="space-y-3">
+        {comments.map((c) => (
+          <div key={c.id} className="border-b border-gray-600 py-2">
+            <div className="text-sm font-semibold">
+              {c.commenterUsername ? `@${c.commenterUsername}` : c.user_id} on {c.movieTitle}
             </div>
-            {c.user_id === userId && (
-              <div className="flex gap-1">
-                <button
-                  className="text-xs text-yellow-400"
-                  onClick={() => {
-                    const edited = prompt("Edit comment:", c.content);
-                    if (edited) updateComment(c.id, edited);
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  className="text-xs text-red-400"
-                  onClick={() => deleteComment(c.id)}
-                >
-                  Delete
-                </button>
-              </div>
-            )}
+            <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
+            <div className="mt-2 text-white">{c.content}</div>
+            <div className="mt-2">
+              <button
+                onClick={() => toggleLike(c)}
+                className="px-2 py-1 rounded-sm border border-white/10 bg-white/5"
+              >
+                Like {c.likes ?? 0}
+              </button>
+            </div>
+            {c._unsynced && <div className="mt-2 text-sm text-yellow-300">Not saved: {c._error}</div>}
           </div>
-          <div className="mt-2 text-white">{c.content}</div>
-          {c._unsynced && (
-            <div className="mt-2 text-sm text-yellow-300 flex items-center justify-between">
-              <div>Not saved: {c._error}</div>
-              <div>
-                <button className="text-xs underline" onClick={() => retrySaveComment(c)}>Retry</button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

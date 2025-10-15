@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import MovieCard from './MovieCard'
 import type { Trailer } from '../lib/data'
-import { getTrailerById, toggleFavorite } from '../lib/data'
+import { getTrailerById, toggleFavorite, fetchFavorites } from '../lib/data'
 import { useUser } from '../hooks/useUser'
 
 const FavoritesList: React.FC = () => {
@@ -13,22 +13,20 @@ const FavoritesList: React.FC = () => {
   useEffect(() => {
     if (!user) return
 
-    const fetchFavorites = async () => {
+    const fetchFavoritesLocal = async () => {
       try {
-        const res = await fetch(`/api/favorites/${user.id}`)
-        if (!res.ok) throw new Error('Failed to fetch favorites')
-        const ids: string[] = await res.json()
-        const mapped = ids.map(id => getTrailerById(id))
-        const favTrailers = mapped.filter((t): t is Trailer => t !== undefined)
-  const unresolved = ids.filter((_, idx) => mapped[idx] === undefined)
-        setTrailers(favTrailers)
-        setUnknownIds(unresolved)
+        const rows = await fetchFavorites(user.id)
+        // fetchFavorites returns Trailer[] (may include placeholders)
+        const known = rows.filter(r => r && r.id) as Trailer[]
+        setTrailers(known)
+        // unknownIds are those with empty title/poster (heuristic)
+        setUnknownIds(known.filter(r => !r.title || r.title === 'Unavailable').map(r => r.id))
       } catch (err) {
         console.error(err)
       }
     }
 
-    fetchFavorites()
+  fetchFavoritesLocal()
   }, [user])
 
   const handleRemoveFavorite = async (trailerId: string) => {
@@ -68,6 +66,7 @@ const FavoritesList: React.FC = () => {
           key={trailer.id}
           trailer={trailer}
           userId={user.id}
+          showDate={false}
           onRemoveFavorite={() => handleRemoveFavorite(trailer.id)}
         />
       ))}
