@@ -18,22 +18,17 @@ const WatchlistPage: React.FC = () => {
       }
 
       try {
-        // ✅ Fetch all watchlist rows for this user
         const { data: watchlistRows, error } = await supabase
           .from("watchlist")
           .select("trailer_id")
           .eq("user_id", user.id);
 
         if (error) throw error;
-        if (!watchlistRows || watchlistRows.length === 0) {
-          setWatchlistData([]);
-          return;
-        }
 
-        // ✅ Get all trailers by ID
-        const trailerIds = watchlistRows.map((row) => String(row.trailer_id));
+        const trailerIds = watchlistRows?.map((row) => String(row.trailer_id)) || [];
         const movies = await Promise.all(trailerIds.map((id) => getMovieById(id)));
-        const validMovies = movies.filter((m): m is Trailer => !!m && !!m.id && !!m.title);
+        const validMovies = movies.filter((m): m is Trailer => !!m?.id && !!m?.title);
+
         setWatchlistData(validMovies);
 
       } catch (err) {
@@ -47,30 +42,34 @@ const WatchlistPage: React.FC = () => {
     fetchWatchlist();
   }, [user]);
 
+  const handleRemoveFromWatchlist = async (id: string) => {
+    try {
+      // Remove in Supabase
+      await supabase.from("watchlist").delete().eq("user_id", user?.id).eq("trailer_id", id);
+      // Update UI
+      setWatchlistData(prev => prev.filter(m => m.id !== id));
+    } catch (err) {
+      console.error("Failed to remove from watchlist:", err);
+    }
+  };
+
   if (loading)
-    return (
-      <div className="text-white text-center mt-20">
-        Loading watchlist...
-      </div>
-    );
+    return <div className="text-white text-center mt-20">Loading watchlist...</div>;
 
   if (!watchlistData.length)
-    return (
-      <div className="text-white text-center mt-20">
-        Your Watchlist is empty
-      </div>
-    );
-
-  const userId = user?.id ?? "";
+    return <div className="text-white text-center mt-20">Your Watchlist is empty</div>;
 
   return (
     <div className="bg-gray-900 min-h-screen p-6">
-      <h1 className="text-2xl font-bold text-white mb-6 text-center">
-        Your Watchlist
-      </h1>
+      <h1 className="text-2xl font-bold text-white mb-6 text-center">Your Watchlist</h1>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {watchlistData.map((movie) => (
-          <MovieCard key={movie.id} movie={movie} userId={userId} />
+        {watchlistData.map(movie => (
+          <MovieCard
+            key={movie.id}
+            movie={movie}
+            userId={user?.id || ""}
+            onRemoveWatchlist={handleRemoveFromWatchlist}
+          />
         ))}
       </div>
     </div>
