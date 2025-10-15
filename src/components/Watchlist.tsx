@@ -2,31 +2,52 @@
 import React, { useEffect, useState } from 'react'
 import MovieCard from './MovieCard'
 import { Link } from 'react-router-dom'
-import { getTrailerById, toggleWatchlist, removeWatchlistRow } from '../lib/data'
+import { getTrailerById, toggleWatchlist, removeWatchlistRow, fetchWatchlist } from '../lib/data'
+import { supabase } from '../lib/supabaseClient'
 import { useUser } from '../hooks/useUser'
 
 const Watchlist: React.FC = () => {
-  const { user } = useUser()
+  const { user, loading } = useUser()
   // Keep rows so duplicate trailer entries can be removed individually
   const [rows, setRows] = useState<Array<{ id: string; trailer_id: string }>>([])
 
   useEffect(() => {
+    if (loading) return
     if (!user) return
 
-    const fetchWatchlist = async () => {
+    const fetchWatchlistLocal = async () => {
       try {
-        const res = await fetch(`/api/watchlist/${user.id}`)
-        if (!res.ok) throw new Error('Failed to fetch watchlist')
-        const data: Array<{ id: string; trailer_id: string }> = await res.json()
-        setRows(data)
-        // we only need rows now; trailers will be derived when rendering
+        const rows = await fetchWatchlist(user.id)
+        // fetchWatchlist returns Trailer[], but Watchlist component expects rows (id + trailer_id)
+        // Convert trailers into row-like objects using trailer.id as trailer_id and generate a synthetic row id
+        const mapped = rows.map((t, idx) => ({ id: `${t.id}-${idx}`, trailer_id: t.id }))
+        setRows(mapped)
       } catch (err) {
         console.error(err)
       }
     }
 
-    fetchWatchlist()
+    fetchWatchlistLocal()
   }, [user])
+
+  // Debug helper: fetch raw watchlist rows directly from Supabase
+  const [rawRows, setRawRows] = useState<Array<{ id: string; trailer_id: string }>>([])
+  const [showDebug, setShowDebug] = useState(false)
+  useEffect(() => {
+    if (loading) return
+    if (!user) return
+    let mounted = true
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('watchlist').select('id,trailer_id').eq('user_id', user.id)
+        if (!mounted) return
+        setRawRows((data as any) ?? [])
+      } catch (e) {
+        console.warn('Failed to load raw watchlist rows', e)
+      }
+    })()
+    return () => { mounted = false }
+  }, [user, rows])
 
   const handleRemoveWatchlist = async (rowId: string, trailerId: string) => {
     if (!user) return
@@ -52,10 +73,28 @@ const Watchlist: React.FC = () => {
     }
   }
 
+  if (loading) return <p className="text-white">Checking sign-in status…</p>
   if (!user) return <p className="text-white">Please log in to see your watchlist.</p>
 
   if (rows.length === 0)
-    return <p className="text-white">Your watchlist is empty.</p>
+    return (
+      <div>
+        <p className="text-white">Your watchlist is empty.</p>
+        <div className="mt-2">
+          <button onClick={() => setShowDebug(v => !v)} className="text-xs underline">Toggle debug</button>
+          {showDebug && (
+              <div className="mt-2 text-sm text-gray-300">
+                <div className="mb-2">Auth debug (from useUser()):</div>
+                <pre className="text-xs bg-black/20 p-2 rounded mb-3" style={{ whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify({ user: user ?? null, loading }, null, 2)}
+                </pre>
+                <div className="mb-2">Raw watchlist rows (from supabase.watchlist):</div>
+                {rawRows.length === 0 ? <div className="text-xs">(no rows)</div> : rawRows.map(r => <div key={r.id}>{r.id} → {r.trailer_id}</div>)}
+              </div>
+          )}
+        </div>
+      </div>
+    )
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">

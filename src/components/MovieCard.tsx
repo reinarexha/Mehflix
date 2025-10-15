@@ -39,6 +39,7 @@ type MovieCardProps = {
   movie?: Trailer
   trailer?: Trailer
   userId?: string
+  showDate?: boolean
   onRemoveFavorite?: (trailerId: string) => Promise<void>
   onRemoveWatchlist?: (trailerId: string) => Promise<void>
 }
@@ -81,12 +82,13 @@ const MovieCard: React.FC<MovieCardProps> = ({
   trailer,
   onRemoveFavorite,
   onRemoveWatchlist,
+  showDate = true,
 }) => {
   const t = movie ?? trailer
   if (!t) return null
 
   const posterUrl = posterMap[t.id] || '/default-poster.jpg'
-  const releaseDate = t.category || 'Unknown Release'
+  const releaseDate = (t as any).releaseDate ? new Date((t as any).releaseDate).toLocaleDateString() : (t.category || 'Unknown Release')
 
   return (
     <div className="bg-gray-800 rounded shadow hover:shadow-lg transition p-2 flex flex-col">
@@ -96,7 +98,7 @@ const MovieCard: React.FC<MovieCardProps> = ({
         className="w-full h-48 object-cover rounded mb-2"
       />
       <h3 className="text-white font-semibold text-sm md:text-base">{t.title}</h3>
-      <p className="text-gray-400 text-xs">{releaseDate}</p>
+  {showDate && <p className="text-gray-400 text-xs">{releaseDate}</p>}
 
       <div className="mt-2 flex gap-2 justify-center">
         {onRemoveFavorite && (

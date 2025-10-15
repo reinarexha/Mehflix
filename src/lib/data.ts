@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import moviesData from './moviesData'
 
 /* ========= Types ========= */
 export type Trailer = {
@@ -21,17 +22,53 @@ export async function getMovieById(id: string): Promise<Trailer | null> {
   return (data as Trailer | null) ?? null;
 }
 
-/* ========= Local helper stub (for Home.tsx fallback) =========
-   If you later mirror your posters in DB, you can implement this to look up a cached map.
-   For now it intentionally returns null so Home.tsx’s fallback object is used.
-*/
+/* ========= Local helper stub (for Home.tsx fallback) ========= */
 export function getTrailerById(_id: string): Trailer | undefined {
+  const local = (moviesData as any[]).find(m => m.id === _id);
+  if (local) {
+    return {
+      id: local.id,
+      title: local.title,
+      youtube_id: (function extractYoutubeId(url: string) {
+        try {
+          const u = new URL(url)
+          if (u.hostname.includes('youtube.com')) return u.searchParams.get('v') || url
+          if (u.hostname.includes('youtu.be')) return u.pathname.slice(1) || url
+          return url
+        } catch {
+          return url
+        }
+      })(local.trailer),
+      category: 'Unknown',
+      poster_url: local.poster,
+    };
+  }
+
+  // Return undefined for unknown IDs instead of a fake placeholder
   return undefined;
+}
+
+/* ========= Ensure trailer exists (DB) ========= */
+async function ensureTrailerExists(trailer: Trailer) {
+  try {
+    const payload = {
+      id: trailer.id,
+      title: trailer.title ?? 'Unknown',
+      youtube_id: trailer.youtube_id ?? trailer.id,
+      category: trailer.category ?? 'Unknown',
+      poster_url: trailer.poster_url ?? '',
+    }
+    const { error } = await supabase.from('trailers').upsert([payload])
+    if (error) throw error
+    return true
+  } catch (e) {
+    console.warn('ensureTrailerExists failed', e)
+    throw e
+  }
 }
 
 /* ========= Watchlist ========= */
 export async function toggleWatchlist(userId: string, trailer: Trailer) {
-  // check if exists
   const { data, error } = await supabase
     .from("watchlist")
     .select("id")
@@ -52,7 +89,20 @@ export async function toggleWatchlist(userId: string, trailer: Trailer) {
   const { error: insErr } = await supabase
     .from("watchlist")
     .insert({ user_id: userId, trailer_id: trailer.id });
-  if (insErr) throw insErr;
+  if (insErr) {
+    const msg = String(insErr.message || insErr).toLowerCase();
+    if (msg.includes('foreign key') || msg.includes('violates foreign key') || msg.includes('trailer_id')) {
+      try {
+        await ensureTrailerExists(trailer)
+        const { error: retryErr } = await supabase.from('watchlist').insert({ user_id: userId, trailer_id: trailer.id })
+        if (retryErr) throw retryErr
+        return { inWatchlist: true }
+      } catch (e) {
+        throw e
+      }
+    }
+    throw insErr
+  }
   return { inWatchlist: true };
 }
 
@@ -78,12 +128,25 @@ export async function toggleFavorite(userId: string, trailer: Trailer) {
   const { error: insErr } = await supabase
     .from("favorites")
     .insert({ user_id: userId, trailer_id: trailer.id });
-  if (insErr) throw insErr;
+  if (insErr) {
+    const msg = String(insErr.message || insErr).toLowerCase();
+    if (msg.includes('foreign key') || msg.includes('violates foreign key') || msg.includes('trailer_id')) {
+      try {
+        await ensureTrailerExists(trailer)
+        const { error: retryErr } = await supabase.from('favorites').insert({ user_id: userId, trailer_id: trailer.id })
+        if (retryErr) throw retryErr
+        return { favorited: true }
+      } catch (e) {
+        throw e
+      }
+    }
+    throw insErr
+  }
 
   return { favorited: true };
 }
 
-/* ========= Favorites fetch ========= */
+/* ========= Fetch Favorites ========= */
 export async function fetchFavorites(userId: string): Promise<Trailer[]> {
   const { data, error } = await supabase
     .from("favorites")
@@ -101,18 +164,15 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
         .select("id,title,youtube_id,category,poster_url")
         .eq("id", id)
         .maybeSingle();
-      if (e) {
-        console.error("fetchFavorites trailer error", id, e);
-        return null;
-      }
-      return t as Trailer | null;
+      if (e || !t) return null;
+      return t as Trailer;
     })
   );
 
-  return trailers.filter(Boolean) as Trailer[];
+  return trailers.filter((t): t is Trailer => !!t);
 }
 
-/* ========= Watchlist fetch ========= */
+/* ========= Fetch Watchlist ========= */
 export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
   const { data, error } = await supabase
     .from("watchlist")
@@ -130,15 +190,13 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
         .select("id,title,youtube_id,category,poster_url")
         .eq("id", id)
         .maybeSingle();
-      if (e) {
-        console.error("fetchWatchlist trailer error", id, e);
-        return null;
-      }
-      return t as Trailer | null;
+
+      if (e || !t) return null;
+      return t as Trailer;
     })
   );
 
-  return trailers.filter(Boolean) as Trailer[];
+  return trailers.filter((t): t is Trailer => !!t);
 }
 
 /* ========= Comments ========= */
@@ -151,11 +209,7 @@ export type CommentRow = {
   likes?: number;
 };
 
-export async function addComment(
-  userId: string,
-  trailerId: string,
-  content: string
-): Promise<void> {
+export async function addComment(userId: string, trailerId: string, content: string): Promise<void> {
   const { error } = await supabase
     .from("comments")
     .insert({ user_id: userId, trailer_id: trailerId, content });
@@ -189,7 +243,7 @@ export async function fetchComments(trailerId: string): Promise<CommentRow[]> {
   return comments.map((c) => ({ ...c, likes: counts.get(c.id) ?? 0 }));
 }
 
-/* ========= Comment likes ========= */
+/* ========= Comment Likes ========= */
 export async function toggleLikeComment(userId: string, commentId: string) {
   const { data, error } = await supabase
     .from("comment_likes")
@@ -216,17 +270,17 @@ export async function toggleLikeComment(userId: string, commentId: string) {
   return { liked: true };
 }
 
-// sanity marker if you want to check via console dynamic import
-export const __DATA_MODULE = "OK";
-
 // Remove a specific watchlist row by its row id
 export async function removeWatchlistRow(rowId: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('watchlist').delete().eq('id', rowId)
     if (error) throw error
-    return true
+       return true;
   } catch (err) {
-    console.warn('removeWatchlistRow failed', err)
-    throw err
+    console.warn('removeWatchlistRow failed', err);
+    throw err;
   }
 }
+
+// sanity marker if you want to check via console dynamic import
+export const __DATA_MODULE = "OK";

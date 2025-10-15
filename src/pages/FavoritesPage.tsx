@@ -96,6 +96,7 @@ export default function FavoritesPage({ userId }: Props) {
               <Link key={item.id} to={`/movie/${trailer.youtube_id}`} className="no-underline text-inherit">
                 <MovieCard
                   trailer={trailer}
+                  showDate={false}
                   onRemoveFavorite={async () => {
                     try {
                       await toggleFavorite(userId, trailer)

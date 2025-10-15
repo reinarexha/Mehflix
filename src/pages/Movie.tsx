@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useUser } from '../hooks/useUser'
-import { toggleFavorite, toggleWatchlist, getTrailerById, fetchFavorites, fetchWatchlist, type CommentRow, type Trailer } from '../lib/data'
+import { toggleFavorite, toggleWatchlist, getTrailerById, fetchFavorites, fetchWatchlist, toggleLikeComment, type CommentRow, type Trailer } from '../lib/data'
 import { supabase } from '../lib/supabaseClient'
 
 export default function Movie() {
@@ -179,15 +179,7 @@ export default function Movie() {
   return { ...r, commenterUsername }
   }
 
-  async function toggleLikeComment(commentId: string) {
-    // Naive implementation: increment likes on the comment row
-  const { data: existing, error: e } = await supabase.from('comments').select('likes').eq('id', commentId).maybeSingle()
-    if (e) throw e
-    const current = (existing?.likes ?? 0) as number
-    const { error } = await supabase.from('comments').update({ likes: current + 1 }).eq('id', commentId)
-    if (error) throw error
-    return { liked: true }
-  }
+
 
   return (
     <main className="max-w-[1080px] mx-auto p-4">
@@ -313,7 +305,15 @@ export default function Movie() {
                       if (!user) return alert('Please sign in to like comments')
                       // optimistic count
                       setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: (x.likes ?? 0) + 1 } : x))
-                      try { await toggleLikeComment(c.id) } catch { setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x)) }
+                      try {
+                        const res = await toggleLikeComment(user.id, c.id)
+                        // if toggle reports not liked, revert
+                        if (!res || res.liked === false) {
+                          setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x))
+                        }
+                      } catch (e) {
+                        setComments(prev => prev.map(x => x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x))
+                      }
                     }} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Like</button>
                   </div>
                 </div>

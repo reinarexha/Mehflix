@@ -124,7 +124,7 @@ export default function Home() {
   const results = moviesData.filter(m => m.title.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
   const [toast, setToast] = useState<string | null>(null)
   const [toastVisible, setToastVisible] = useState(false)
-  const { user } = useUser()
+  const { user, loading } = useUser()
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set())
 
@@ -201,6 +201,7 @@ export default function Home() {
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}
         onFavorite={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to favorite movies')
           const next = new Set(favoriteIds)
           const isFav = next.has(id)
@@ -223,6 +224,7 @@ export default function Home() {
           }
         }}
         onWatchlist={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to manage watchlist')
           const next = new Set(watchlistIds)
           const inList = next.has(id)
@@ -254,6 +256,7 @@ export default function Home() {
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}
         onFavorite={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to favorite movies')
           const next = new Set(favoriteIds)
           const isFav = next.has(id)
@@ -276,6 +279,7 @@ export default function Home() {
           }
         }}
         onWatchlist={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to manage watchlist')
           const next = new Set(watchlistIds)
           const inList = next.has(id)
@@ -306,6 +310,7 @@ export default function Home() {
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}
         onFavorite={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to favorite movies')
           const next = new Set(favoriteIds)
           const isFav = next.has(id)
@@ -328,6 +333,7 @@ export default function Home() {
           }
         }}
         onWatchlist={async (id) => {
+          if (loading) return showToast('Checking sign-in status…')
           if (!user) return showToast('Please sign in to manage watchlist')
           const next = new Set(watchlistIds)
           const inList = next.has(id)
