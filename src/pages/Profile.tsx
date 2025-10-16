@@ -1,25 +1,37 @@
 // src/pages/Profile.tsx
 import { useEffect, useState } from 'react'
-import { useUser } from '../hooks/useUser'
 import { Link, useNavigate } from 'react-router-dom'
+import { useUser } from '../hooks/useUser'
 import { supabase } from '../lib/supabaseClient'
-import { getTrailerById } from '../lib/data'
+import { getTrailerById, fetchWatchlist, fetchFavorites, clearUserData } from '../lib/data'
+
+type Trailer = {
+  id: string
+  title: string
+  youtube_id?: string
+  category?: string
+  poster_url?: string
+}
 
 const Profile: React.FC = () => {
   const { user } = useUser()
   const [username, setUsername] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
   const [notifications, setNotifications] = useState<any[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
+
+  const [watchlist, setWatchlist] = useState<Trailer[]>([])
+  const [favorites, setFavorites] = useState<Trailer[]>([])
+
+  const [moviesLoading, setMoviesLoading] = useState(false)
+  const [clearingData, setClearingData] = useState(false)
+
   const navigate = useNavigate()
 
-  // Fetch latest profile data
+  // ---------------- Profile ----------------
   const fetchProfile = async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-
+    if (!user) return
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -28,20 +40,7 @@ const Profile: React.FC = () => {
         .maybeSingle()
 
       if (error) console.log('Error fetching profile:', error.message)
-
-      if (profileData && profileData.username) {
-        setUsername(profileData.username)
-      } else {
-        // Fallback to auth metadata
-        try {
-          const { data: authData } = await supabase.auth.getUser()
-          const authUser = authData.user
-          const meta = (authUser as any)?.user_metadata
-          setUsername(meta?.username || null)
-        } catch {
-          setUsername(null)
-        }
-      }
+      setUsername(profileData?.username ?? user.email ?? null)
     } finally {
       setLoading(false)
     }
@@ -49,82 +48,46 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchProfile()
-
-    const onProfileUpdated = (e: any) => {
-      if (e?.detail?.username) setUsername(e.detail.username)
-      else fetchProfile()
-    }
-    const onAuthRefreshed = () => fetchProfile()
-
-    window.addEventListener('profile:updated', onProfileUpdated)
-    window.addEventListener('auth:refreshed', onAuthRefreshed)
-
-    return () => {
-      window.removeEventListener('profile:updated', onProfileUpdated)
-      window.removeEventListener('auth:refreshed', onAuthRefreshed)
-    }
   }, [user])
 
-  // Notifications: who liked my comments
+  // ---------------- Notifications ----------------
   useEffect(() => {
-    if (!user) {
-      setNotifications([])
-      return
-    }
+    if (!user) return
 
     let mounted = true
-
-    async function loadNotifications() {
+    const loadNotifications = async () => {
       setNotifLoading(true)
       try {
-        const userId = user.id
-
-        // 1) fetch my comments
         const { data: myComments } = await supabase
           .from('comments')
           .select('id, content, trailer_id')
-          .eq('user_id', userId)
+          .eq('user_id', user.id)
 
-        const commentRows = (myComments ?? []) as any[]
-        const ids = commentRows.map(c => c.id)
-        if (ids.length === 0) {
+        const commentRows = myComments ?? []
+        const commentIds = commentRows.map(c => c.id)
+        if (commentIds.length === 0) {
           if (mounted) setNotifications([])
           return
         }
 
-        // 2) fetch likes on those comments
         const { data: likes } = await supabase
           .from('comment_likes')
-          .select('id, user_id, comment_id, created_at')
-          .in('comment_id', ids)
+          .select('id, comment_id, created_at')
+          .in('comment_id', commentIds)
           .order('created_at', { ascending: false })
 
-        const likesRows = likes ?? []
+        const commentMap: Record<string, any> = {}
+        for (const c of commentRows) commentMap[c.id] = c
 
-        // 3) fetch usernames for likers
-        const userIds = [...new Set(likesRows.map(l => l.user_id))]
-        const stringIds = userIds.map(id => String(id)) // convert to string
-
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', stringIds)
-
-        const profilesMap = new Map(profiles?.map(p => [String(p.id), p.username]))
-
-        // 4) map notifications with usernames
-        const mapByComment: Record<string, any> = {}
-        for (const c of commentRows) mapByComment[c.id] = c
-
-        const items = likesRows.map(l => {
-          const comment = mapByComment[l.comment_id]
-          const likerName = profilesMap.get(String(l.user_id)) || 'Unknown User'
+        const items = (likes ?? []).map(l => {
+          const comment = commentMap[l.comment_id]
           const trailerId = comment?.trailer_id || null
           const trailer = trailerId ? getTrailerById(trailerId) : undefined
           const movieLink = trailer ? `/movie/${trailer.youtube_id ?? trailer.id}` : `/movie/${trailerId}`
+
           return {
             id: l.id,
-            likerName,
+            likerName: 'A watcher agrees with you',
             commentContent: comment?.content || '',
             created_at: l.created_at,
             movieLink,
@@ -143,12 +106,74 @@ const Profile: React.FC = () => {
     return () => { mounted = false }
   }, [user])
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut()
-    } catch (e) {
-      console.warn('Sign out failed', e)
+  // ---------------- Watchlist & Favorites ----------------
+  const loadMovies = async () => {
+    if (!user) {
+      setWatchlist([])
+      setFavorites([])
+      return
     }
+    
+    setMoviesLoading(true)
+    try {
+      console.log('🔄 Loading movies for user:', user.id);
+      console.log('📧 User email:', user.email);
+      
+      const [wl, favs] = await Promise.all([
+        fetchWatchlist(user.id),
+        fetchFavorites(user.id)
+      ])
+      
+      console.log('📥 Raw watchlist data:', wl);
+      console.log('📥 Raw favorites data:', favs);
+      console.log('🔢 Watchlist count:', wl.length);
+      console.log('🔢 Favorites count:', favs.length);
+      
+      setWatchlist(wl || [])
+      setFavorites(favs || [])
+    } catch (e) {
+      console.error('❌ Failed to load movies', e)
+      setWatchlist([])
+      setFavorites([])
+    } finally {
+      setMoviesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMovies()
+  }, [user])
+
+  // ---------------- Clear Data ----------------
+  const handleClearData = async () => {
+    if (!user) return
+    
+    const confirmClear = window.confirm(
+      'Are you sure you want to clear ALL your watchlist and favorites data? This cannot be undone.'
+    )
+    
+    if (!confirmClear) return
+
+    setClearingData(true)
+    try {
+      const result = await clearUserData(user.id)
+      if (result.success) {
+        alert(`✅ ${result.message}`)
+        await loadMovies() // Reload to show empty states
+      } else {
+        alert(`❌ ${result.message}`)
+      }
+    } catch (error) {
+      alert('❌ Failed to clear data')
+      console.error('Error clearing data:', error)
+    } finally {
+      setClearingData(false)
+    }
+  }
+
+  // ---------------- Logout ----------------
+  const handleLogout = async () => {
+    try { await supabase.auth.signOut() } catch {}
     navigate('/login')
   }
 
@@ -173,73 +198,146 @@ const Profile: React.FC = () => {
     .toUpperCase()
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6 flex justify-center">
-      <div className="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-lg overflow-hidden text-white">
-        <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left: avatar & basic info */}
-          <div className="flex flex-col items-center md:items-start md:col-span-1">
-            <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-3xl font-bold mb-4">
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="max-w-4xl mx-auto p-4">
+        {/* Personal Info */}
+        <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+          <div className="flex flex-col items-center md:flex-row md:items-start gap-6">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center text-2xl font-bold">
               {initials}
             </div>
-            <h2 className="text-xl font-bold">{username || user.email}</h2>
-            <div className="mt-4 flex flex-col gap-2 w-full">
-              <Link
-                to="/edit-info"
-                className="text-center bg-surface hover:bg-white/5 px-3 py-2 rounded-md"
-              >
-                Edit Info
-              </Link>
-              <div className="flex gap-2">
+            
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-xl font-bold mb-2">{username || user.email}</h2>
+              <p className="text-gray-400 text-sm mb-4">User ID: {user.id.substring(0, 8)}...</p>
+              
+              <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                <Link
+                  to="/edit-info"
+                  className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-md transition-colors"
+                >
+                  Edit Info
+                </Link>
                 <button
-                  onClick={fetchProfile}
-                  className="text-center bg-blue-600 hover:bg-blue-700 mt-2 px-3 py-1 rounded"
+                  onClick={loadMovies}
+                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors"
                 >
                   Refresh Profile
                 </button>
                 <button
+                  onClick={handleClearData}
+                  disabled={clearingData}
+                  className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {clearingData ? 'Clearing...' : 'Clear All Data'}
+                </button>
+                <button
                   onClick={handleLogout}
-                  className="text-center bg-red-600 hover:bg-red-700 mt-2 px-3 py-1 rounded"
+                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md transition-colors"
                 >
                   Log out
                 </button>
               </div>
             </div>
-            {/* Notifications */}
-            <div className="w-full mt-4">
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-3 text-center">Notifications</h3>
-                {notifLoading ? (
-                  <div className="text-center text-sm text-gray-300">Loading...</div>
-                ) : notifications.length === 0 ? (
-                  <div className="text-center text-sm text-gray-300">No notifications yet</div>
-                ) : (
-                  <ul className="space-y-2 text-sm">
-                    {notifications.map((n) => (
-                      <li key={n.id} className="p-2 bg-gray-800 rounded flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="text-gray-200"><strong>{n.likerName}</strong> liked your comment</div>
-                          <div className="text-xs text-gray-400 truncate">"{n.commentContent}"</div>
-                          <a href={n.movieLink} className="text-xs text-blue-400 mt-1 inline-block">View</a>
-                        </div>
-                        <div className="text-xs text-gray-500 ml-3">{new Date(n.created_at).toLocaleString()}</div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Right: Personal Info */}
-          <div className="md:col-span-2">
-            <div className="bg-gray-700 rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-3">Personal Info</h3>
-              <div className="text-sm text-gray-300 space-y-2">
-                <div><strong>Email:</strong> {user.email}</div>
-                <div><strong>Username:</strong> {username || 'Not set'}</div>
-              </div>
-            </div>
+        {/* Watchlist Section */}
+        <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Watchlist</h3>
+            <span className="text-sm text-gray-400">{watchlist.length} items</span>
           </div>
+          {moviesLoading ? (
+            <div className="text-gray-300 text-center py-8">Loading...</div>
+          ) : watchlist.length === 0 ? (
+            <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
+              <div className="text-xl mb-2">📺</div>
+              <div>No movies in watchlist</div>
+              <div className="text-sm mt-2 text-gray-500">Add movies from the home page to see them here</div>
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
+              {watchlist.map(m => (
+                <div key={m.id} className="flex-shrink-0 w-40">
+                  <img 
+                    src={m.poster_url} 
+                    alt={m.title} 
+                    className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160x224/374151/9CA3AF?text=No+Image'
+                    }}
+                  />
+                  <div className="mt-3 text-sm font-medium text-center truncate px-1">{m.title}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Favorites Section */}
+        <div className="bg-gray-800 rounded-2xl p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Favorites</h3>
+            <span className="text-sm text-gray-400">{favorites.length} items</span>
+          </div>
+          {moviesLoading ? (
+            <div className="text-gray-300 text-center py-8">Loading...</div>
+          ) : favorites.length === 0 ? (
+            <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
+              <div className="text-xl mb-2">⭐</div>
+              <div>No favorite movies</div>
+              <div className="text-sm mt-2 text-gray-500">Favorite movies from the home page to see them here</div>
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
+              {favorites.map(m => (
+                <div key={m.id} className="flex-shrink-0 w-40">
+                  <img 
+                    src={m.poster_url} 
+                    alt={m.title} 
+                    className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160x224/374151/9CA3AF?text=No+Image'
+                    }}
+                  />
+                  <div className="mt-3 text-sm font-medium text-center truncate px-1">{m.title}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Notifications Section */}
+        <div className="bg-gray-800 rounded-2xl p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Notifications</h3>
+            <span className="text-sm text-gray-400">{notifications.length} items</span>
+          </div>
+          {notifLoading ? (
+            <div className="text-gray-300 text-center py-8">Loading...</div>
+          ) : notifications.length === 0 ? (
+            <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
+              <div className="text-xl mb-2">🔔</div>
+              <div>No notifications yet</div>
+              <div className="text-sm mt-2 text-gray-500">You'll get notifications when others interact with your comments</div>
+            </div>
+          ) : (
+            <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
+              {notifications.map(n => (
+                <div key={n.id} className="flex-shrink-0 w-80 bg-gray-700 p-4 rounded-lg hover:bg-gray-600 transition-colors border border-gray-600">
+                  <div className="text-gray-200 text-sm font-medium mb-2">{n.likerName}</div>
+                  <div className="text-gray-100 text-sm mb-3 line-clamp-2 bg-gray-800 p-2 rounded">{n.commentContent}</div>
+                  <Link 
+                    to={n.movieLink} 
+                    className="text-blue-400 hover:text-blue-300 text-sm font-medium inline-block bg-blue-900/20 px-3 py-1 rounded"
+                  >
+                    Go to movie →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
