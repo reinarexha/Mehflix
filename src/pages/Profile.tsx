@@ -27,12 +27,10 @@ const Profile: React.FC = () => {
         .eq('id', user.id)
         .maybeSingle()
 
-      if (error) {
-        console.log('Error fetching profile:', error.message)
-      }
+      if (error) console.log('Error fetching profile:', error.message)
 
-      if (profileData && (profileData as any).username) {
-        setUsername((profileData as any).username)
+      if (profileData && profileData.username) {
+        setUsername(profileData.username)
       } else {
         // Fallback to auth metadata
         try {
@@ -40,7 +38,7 @@ const Profile: React.FC = () => {
           const authUser = authData.user
           const meta = (authUser as any)?.user_metadata
           setUsername(meta?.username || null)
-        } catch (e) {
+        } catch {
           setUsername(null)
         }
       }
@@ -51,14 +49,12 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchProfile()
+
     const onProfileUpdated = (e: any) => {
       if (e?.detail?.username) setUsername(e.detail.username)
       else fetchProfile()
     }
-    const onAuthRefreshed = () => {
-      // auth metadata might have changed (username stored in auth user metadata)
-      fetchProfile()
-    }
+    const onAuthRefreshed = () => fetchProfile()
 
     window.addEventListener('profile:updated', onProfileUpdated)
     window.addEventListener('auth:refreshed', onAuthRefreshed)
@@ -77,11 +73,13 @@ const Profile: React.FC = () => {
     }
 
     let mounted = true
+
     async function loadNotifications() {
       setNotifLoading(true)
       try {
+        const userId = user.id
+
         // 1) fetch my comments
-  const userId = user!.id
         const { data: myComments } = await supabase
           .from('comments')
           .select('id, content, trailer_id')
@@ -94,21 +92,33 @@ const Profile: React.FC = () => {
           return
         }
 
-        // 2) fetch likes on those comments, include liker profile if available
+        // 2) fetch likes on those comments
         const { data: likes } = await supabase
           .from('comment_likes')
-          .select('id, user_id, comment_id, created_at, liker:profiles(username)')
+          .select('id, user_id, comment_id, created_at')
           .in('comment_id', ids)
           .order('created_at', { ascending: false })
 
-        const likesRows = (likes ?? []) as any[]
+        const likesRows = likes ?? []
 
+        // 3) fetch usernames for likers
+        const userIds = [...new Set(likesRows.map(l => l.user_id))]
+        const stringIds = userIds.map(id => String(id)) // convert to string
+
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', stringIds)
+
+        const profilesMap = new Map(profiles?.map(p => [String(p.id), p.username]))
+
+        // 4) map notifications with usernames
         const mapByComment: Record<string, any> = {}
         for (const c of commentRows) mapByComment[c.id] = c
 
         const items = likesRows.map(l => {
           const comment = mapByComment[l.comment_id]
-          const likerName = (l.liker && l.liker.username) || l.user_id
+          const likerName = profilesMap.get(String(l.user_id)) || 'Unknown User'
           const trailerId = comment?.trailer_id || null
           const trailer = trailerId ? getTrailerById(trailerId) : undefined
           const movieLink = trailer ? `/movie/${trailer.youtube_id ?? trailer.id}` : `/movie/${trailerId}`
@@ -130,7 +140,6 @@ const Profile: React.FC = () => {
     }
 
     loadNotifications()
-
     return () => { mounted = false }
   }, [user])
 
@@ -140,7 +149,6 @@ const Profile: React.FC = () => {
     } catch (e) {
       console.warn('Sign out failed', e)
     }
-    // Navigate to login and rely on ProtectedRoute to block other pages
     navigate('/login')
   }
 
@@ -196,29 +204,7 @@ const Profile: React.FC = () => {
                 </button>
               </div>
             </div>
-            {/* My Activity: moved under avatar/buttons */}
-            <div className="w-full mt-4">
-              <div className="bg-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold mb-3 text-center">My Activity</h3>
-                <div className="flex justify-center gap-6">
-                  <Link to="/watchlist" className="bg-gray-800 rounded-md p-3 flex flex-col items-center w-28">
-                    {/* clock icon */}
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mb-1">
-                      <path d="M12 1.75a10.25 10.25 0 1 0 0 20.5 10.25 10.25 0 0 0 0-20.5Zm0 18.5A8.25 8.25 0 1 1 12 3.75a8.25 8.25 0 0 1 0 16.5Zm.75-13.5h-1.5v6l5 3 .75-1.23-4.25-2.52V6.75Z" />
-                    </svg>
-                    <div className="text-xs text-gray-300">Watchlist</div>
-                  </Link>
-                  <Link to="/favorites" className="bg-gray-800 rounded-md p-3 flex flex-col items-center w-28">
-                    {/* star icon */}
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mb-1">
-                      <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21 12 17.27Z" />
-                    </svg>
-                    <div className="text-xs text-gray-300">Favorites</div>
-                  </Link>
-                </div>
-              </div>
-            </div>
-            {/* Notifications: who liked my comments */}
+            {/* Notifications */}
             <div className="w-full mt-4">
               <div className="bg-gray-700 rounded-lg p-4">
                 <h3 className="text-lg font-semibold mb-3 text-center">Notifications</h3>
