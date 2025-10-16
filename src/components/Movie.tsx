@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useUser } from "../hooks/useUser";
 import { Heart, Send } from "lucide-react";
 
 type Comment = {
@@ -10,9 +9,7 @@ type Comment = {
   content: string;
   created_at: string;
   likes: number;
-  profiles: {
-    username: string;
-  };
+  commenterUsername?: string | null;
 };
 
 type Props = {
@@ -21,29 +18,20 @@ type Props = {
 };
 
 export default function Movie({ movie, userId }: Props) {
-  const { user } = useUser();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [likes, setLikes] = useState<{ [key: string]: boolean }>({});
 
-  // ✅ Safe trailer identifier
+  // Safe trailer identifier
   const trailerIdentifier = movie?.id?.toString() || "";
 
-  // Fetch comments for this movie
+  // Fetch comments for this movie (no join; fetch usernames separately)
   const fetchComments = async () => {
     if (!trailerIdentifier) return;
 
     const { data, error } = await supabase
       .from("comments")
-      .select(`
-        id,
-        user_id,
-        trailer_id,
-        content,
-        created_at,
-        likes,
-        profiles!comments_user_id_profiles(username)
-      `)
+      .select("id, user_id, trailer_id, content, created_at, likes")
       .eq("trailer_id", trailerIdentifier)
       .order("created_at", { ascending: false });
 
@@ -52,12 +40,23 @@ export default function Movie({ movie, userId }: Props) {
       return;
     }
 
-    const normalized = (data || []).map((c: any) => ({
-      ...c,
-      profiles: c.profiles?.[0] || { username: "Unknown" },
-    }));
+    const rows = (data || []) as Comment[];
+    setComments(rows);
 
-    setComments(normalized);
+    // Load usernames for distinct user_ids (if profiles table exists)
+    const ids = Array.from(new Set(rows.map((r) => r.user_id)));
+    if (ids.length) {
+      try {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .in("id", ids);
+        const map = new Map((profiles ?? []).map((p: any) => [p.id, p.username as string | null]));
+        setComments((prev) => prev.map((c) => ({ ...c, commenterUsername: map.get(c.user_id) ?? null })));
+      } catch {
+        // If profiles table is missing, silently fall back to user_id
+      }
+    }
   };
 
   // Add a new comment
@@ -66,18 +65,8 @@ export default function Movie({ movie, userId }: Props) {
 
     const { data, error } = await supabase
       .from("comments")
-      .insert([
-        { user_id: userId, trailer_id: trailerIdentifier, content: newComment },
-      ])
-      .select(`
-        id,
-        user_id,
-        trailer_id,
-        content,
-        created_at,
-        likes,
-        profiles!comments_user_id_profiles(username)
-      `);
+      .insert([{ user_id: userId, trailer_id: trailerIdentifier, content: newComment }])
+      .select("id, user_id, trailer_id, content, created_at, likes");
 
     if (error) {
       console.error("Error adding comment:", error.message);
@@ -85,11 +74,11 @@ export default function Movie({ movie, userId }: Props) {
     }
 
     if (data && data.length > 0) {
-      const newCommentData = {
-        ...data[0],
-        profiles: data[0].profiles?.[0] || { username: "Unknown" },
-      };
-      setComments((prev) => [newCommentData, ...prev]);
+      const newRow = data[0] as Comment;
+      setComments((prev) => [
+        { ...newRow, commenterUsername: prev.find((p) => p.user_id === newRow.user_id)?.commenterUsername ?? null },
+        ...prev,
+      ]);
       setNewComment("");
     }
   };
@@ -121,9 +110,7 @@ export default function Movie({ movie, userId }: Props) {
       console.error("Error updating likes:", updateError.message);
     } else {
       setComments((prev) =>
-        prev.map((comment) =>
-          comment.id === commentId ? { ...comment, likes: newLikesCount } : comment
-        )
+        prev.map((comment) => (comment.id === commentId ? { ...comment, likes: newLikesCount } : comment))
       );
     }
   };
@@ -134,12 +121,10 @@ export default function Movie({ movie, userId }: Props) {
     if (movie?.id) fetchComments();
   }, [movie?.id]);
 
-  // ✅ Loading state
+  // Loading state
   if (!movie || !movie.id) {
     return (
-      <div className="text-center text-neutral-400 py-10">
-        Loading movie details...
-      </div>
+      <div className="text-center text-neutral-400 py-10">Loading movie details...</div>
     );
   }
 
@@ -161,10 +146,7 @@ export default function Movie({ movie, userId }: Props) {
             onChange={(e) => setNewComment(e.target.value)}
             className="flex-1 bg-neutral-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-600"
           />
-          <button
-            onClick={addComment}
-            className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-xl text-sm flex items-center gap-1"
-          >
+          <button onClick={addComment} className="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-xl text-sm flex items-center gap-1">
             <Send size={14} /> Send
           </button>
         </div>
@@ -175,13 +157,10 @@ export default function Movie({ movie, userId }: Props) {
         ) : (
           <div className="space-y-3">
             {comments.map((comment) => (
-              <div
-                key={comment.id}
-                className="bg-neutral-800 rounded-xl p-3 text-sm flex flex-col"
-              >
+              <div key={comment.id} className="bg-neutral-800 rounded-xl p-3 text-sm flex flex-col">
                 <div className="flex justify-between items-center">
                   <span className="text-blue-400 font-medium">
-                    {comment.profiles?.username || "Unknown User"}
+                    {comment.commenterUsername ?? comment.user_id}
                   </span>
                   <span className="text-neutral-500 text-xs">
                     {new Date(comment.created_at).toLocaleString()}
@@ -192,14 +171,9 @@ export default function Movie({ movie, userId }: Props) {
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     onClick={() => toggleLike(comment.id)}
-                    className={`flex items-center gap-1 text-sm ${
-                      likes[comment.id] ? "text-red-500" : "text-neutral-400"
-                    }`}
+                    className={`flex items-center gap-1 text-sm ${likes[comment.id] ? "text-red-500" : "text-neutral-400"}`}
                   >
-                    <Heart
-                      size={14}
-                      fill={likes[comment.id] ? "red" : "none"}
-                    />
+                    <Heart size={14} fill={likes[comment.id] ? "red" : "none"} />
                     {comment.likes}
                   </button>
                 </div>
@@ -210,4 +184,4 @@ export default function Movie({ movie, userId }: Props) {
       </div>
     </div>
   );
-}false
+}

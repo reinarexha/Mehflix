@@ -10,7 +10,7 @@ import Home from './pages/Home';
 import Categories from './pages/Categories';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
-import Movie from './components/Movie';
+import MoviePage from './pages/MoviePage';
 import CategoryPage from './pages/Category';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -77,7 +77,7 @@ function App() {
             <Route path="/home" element={<Home />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" replace />} />
-            <Route path="/movie/:id" element={<Movie />} />
+            <Route path="/movie/:id" element={<MoviePage />} />
             <Route path="/category/:slug" element={<CategoryPage />} />
             <Route path="/search" element={<Home />} />
 
@@ -99,3 +99,4 @@ function App() {
 }
 
 export default App;
+
