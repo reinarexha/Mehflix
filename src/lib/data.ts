@@ -1,6 +1,4 @@
-// src/lib/data.ts
 import { supabase } from "./supabaseClient";
-import moviesData from './moviesData'
 
 /* ========= Types ========= */
 export type Trailer = {
@@ -43,64 +41,95 @@ export async function getMovieById(id: string): Promise<Trailer | null> {
   }
 }
 
-/* ========= Local helper stub (for Home.tsx fallback) ========= */
-export function getTrailerById(id: string): Trailer | undefined {
-  if (!id) return undefined;
-  
-  try {
-    const local = (moviesData as any[]).find(m => m.id === id);
-    if (local) {
-      return {
-        id: local.id,
-        title: local.title || 'Unknown Title',
-        youtube_id: (function extractYoutubeId(url: string) {
-          try {
-            const u = new URL(url);
-            if (u.hostname.includes('youtube.com')) return u.searchParams.get('v') || url;
-            if (u.hostname.includes('youtu.be')) return u.pathname.slice(1) || url;
-            return url;
-          } catch {
-            return url;
-          }
-        })(local.trailer || ''),
-        category: local.category || 'Unknown',
-        poster_url: local.poster || '',
-      };
-    }
-    return undefined;
-  } catch (error) {
-    console.error('Error in getTrailerById:', error);
-    return undefined;
-  }
-}
+/* ========= REMOVED: getTrailerById function - Using database only ========= */
 
 /* ========= Ensure trailer exists (DB) ========= */
 async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
   if (!trailer?.id) return false;
   
   try {
-    const payload = {
+    // Validate and clean trailer data
+    const validatedTrailer = {
       id: trailer.id,
-      title: trailer.title || 'Unknown',
+      title: trailer.title && !trailer.title.includes('Unknown') 
+        ? trailer.title 
+        : 'Unknown Movie',
       youtube_id: trailer.youtube_id || trailer.id,
       category: trailer.category || 'Unknown',
-      poster_url: trailer.poster_url || '',
+      // Fix poster URLs - replace local paths with valid URLs
+      poster_url: isValidPosterUrl(trailer.poster_url) 
+        ? trailer.poster_url 
+        : getDefaultPosterUrl()
     };
+
+    // First check if trailer already exists
+    const { data: existingTrailer } = await supabase
+      .from('trailers')
+      .select('id, title, poster_url')
+      .eq('id', validatedTrailer.id)
+      .maybeSingle();
+
+    // If trailer exists, update it with validated data
+    if (existingTrailer) {
+      console.log('🔄 Updating existing trailer:', validatedTrailer.id, validatedTrailer.title);
+      const { error } = await supabase
+        .from('trailers')
+        .update({
+          title: validatedTrailer.title,
+          youtube_id: validatedTrailer.youtube_id,
+          category: validatedTrailer.category,
+          poster_url: validatedTrailer.poster_url
+        })
+        .eq('id', validatedTrailer.id);
+      
+      if (error) {
+        console.error('❌ Error updating trailer:', error);
+        return false;
+      }
+      console.log('✅ Updated trailer:', validatedTrailer.id, validatedTrailer.title);
+      return true;
+    }
+
+    // If trailer doesn't exist, create it
+    console.log('🚀 Creating new trailer:', validatedTrailer);
     
     const { error } = await supabase
       .from('trailers')
-      .upsert([payload], { onConflict: 'id' });
+      .insert([validatedTrailer]);
       
     if (error) {
-      console.error('Error ensuring trailer exists:', error);
+      console.error('❌ Error creating trailer:', error);
       return false;
     }
     
+    console.log('✅ Created new trailer:', validatedTrailer.id, validatedTrailer.title);
     return true;
   } catch (error) {
-    console.error('Exception in ensureTrailerExists:', error);
+    console.error('❌ Exception in ensureTrailerExists:', error);
     return false;
   }
+}
+
+/* ========= Helper functions for poster URLs ========= */
+function isValidPosterUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (url.startsWith('/posters/')) return false; // Local paths are invalid
+  if (url.includes('placeholder.com')) return false; // Placeholder is invalid
+  if (url.includes('Unknown')) return false;
+  return true;
+}
+
+function getDefaultPosterUrl(): string {
+  // Use a simple colored placeholder instead of external URL
+  return `data:image/svg+xml;base64,${btoa(`
+    <svg width="300" height="450" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#374151"/>
+      <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+            font-family="Arial, sans-serif" font-size="16" fill="white">
+        No Poster
+      </text>
+    </svg>
+  `)}`;
 }
 
 /* ========= Watchlist ========= */
@@ -110,6 +139,8 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
   }
 
   try {
+    console.log('🎬 Toggle watchlist for:', trailer.title, 'ID:', trailer.id);
+
     // Check if already in watchlist
     const { data, error } = await supabase
       .from("watchlist")
@@ -128,10 +159,17 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
         .eq("id", data.id);
         
       if (delErr) throw delErr;
+      console.log('❌ Removed from watchlist:', trailer.title);
       return { inWatchlist: false };
     }
 
-    // If doesn't exist, add it
+    // If doesn't exist, add it - but first ensure trailer exists with valid data
+    console.log('👨‍💼 Ensuring trailer exists before adding to watchlist...');
+    const ensured = await ensureTrailerExists(trailer);
+    if (!ensured) {
+      throw new Error('Failed to ensure trailer exists in database');
+    }
+
     const { error: insErr } = await supabase
       .from("watchlist")
       .insert({ 
@@ -140,26 +178,14 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
       });
 
     if (insErr) {
-      const msg = String(insErr.message || insErr).toLowerCase();
-      
-      // If foreign key constraint fails, ensure trailer exists and retry
-      if (msg.includes('foreign key') || msg.includes('violates foreign key') || msg.includes('trailer_id')) {
-        const ensured = await ensureTrailerExists(trailer);
-        if (!ensured) throw new Error('Failed to ensure trailer exists');
-        
-        const { error: retryErr } = await supabase
-          .from('watchlist')
-          .insert({ user_id: userId, trailer_id: trailer.id });
-          
-        if (retryErr) throw retryErr;
-        return { inWatchlist: true };
-      }
+      console.error('❌ Error adding to watchlist:', insErr);
       throw insErr;
     }
 
+    console.log('✅ Added to watchlist:', trailer.title);
     return { inWatchlist: true };
   } catch (error) {
-    console.error('Error in toggleWatchlist:', error);
+    console.error('❌ Error in toggleWatchlist:', error);
     throw error;
   }
 }
@@ -171,6 +197,8 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
   }
 
   try {
+    console.log('⭐ Toggle favorite for:', trailer.title, 'ID:', trailer.id);
+
     // Check if already in favorites
     const { data, error } = await supabase
       .from("favorites")
@@ -189,10 +217,17 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
         .eq("id", data.id);
         
       if (delErr) throw delErr;
+      console.log('❌ Removed from favorites:', trailer.title);
       return { favorited: false };
     }
 
-    // If doesn't exist, add it
+    // If doesn't exist, add it - but first ensure trailer exists with valid data
+    console.log('👨‍💼 Ensuring trailer exists before adding to favorites...');
+    const ensured = await ensureTrailerExists(trailer);
+    if (!ensured) {
+      throw new Error('Failed to ensure trailer exists in database');
+    }
+
     const { error: insErr } = await supabase
       .from("favorites")
       .insert({ 
@@ -201,26 +236,14 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
       });
 
     if (insErr) {
-      const msg = String(insErr.message || insErr).toLowerCase();
-      
-      // If foreign key constraint fails, ensure trailer exists and retry
-      if (msg.includes('foreign key') || msg.includes('violates foreign key') || msg.includes('trailer_id')) {
-        const ensured = await ensureTrailerExists(trailer);
-        if (!ensured) throw new Error('Failed to ensure trailer exists');
-        
-        const { error: retryErr } = await supabase
-          .from('favorites')
-          .insert({ user_id: userId, trailer_id: trailer.id });
-          
-        if (retryErr) throw retryErr;
-        return { favorited: true };
-      }
+      console.error('❌ Error adding to favorites:', insErr);
       throw insErr;
     }
 
+    console.log('✅ Added to favorites:', trailer.title);
     return { favorited: true };
   } catch (error) {
-    console.error('Error in toggleFavorite:', error);
+    console.error('❌ Error in toggleFavorite:', error);
     throw error;
   }
 }
@@ -228,7 +251,7 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
 /* ========= Fetch Favorites ========= */
 export async function fetchFavorites(userId: string): Promise<Trailer[]> {
   if (!userId) {
-    console.log('No user ID provided to fetchFavorites');
+    console.log('❌ No user ID provided to fetchFavorites');
     return [];
   }
 
@@ -239,46 +262,49 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
       .eq("user_id", userId);
     
     if (error) {
-      console.error('Error fetching favorites:', error);
+      console.error('❌ Error fetching favorites:', error);
       return [];
     }
 
     const ids = (data || []).map((r: any) => String(r.trailer_id));
     
     if (ids.length === 0) {
-      console.log('No favorites found for user:', userId);
+      console.log('ℹ️ No favorites found for user:', userId);
       return [];
     }
+
+    console.log('📥 Fetching favorite trailers for IDs:', ids);
 
     // Fetch trailer details for each favorite
     const trailers = await Promise.all(
       ids.map(async (id) => {
         try {
-          const { data: trailer, error: trailerError } = await supabase
-            .from("trailers")
-            .select("id,title,youtube_id,category,poster_url")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (trailerError || !trailer) {
-            console.warn(`Trailer not found for favorite: ${id}`);
+          const trailer = await getMovieById(id);
+          if (!trailer) {
+            console.warn(`❌ Trailer not found for favorite: ${id}`);
             return null;
           }
-          
-          return trailer as Trailer;
+
+          // Ensure poster URL is valid
+          if (!isValidPosterUrl(trailer.poster_url)) {
+            trailer.poster_url = getDefaultPosterUrl();
+          }
+
+          console.log('✅ Loaded favorite trailer:', trailer.title);
+          return trailer;
         } catch (err) {
-          console.warn(`Error fetching trailer ${id}:`, err);
+          console.warn(`❌ Exception fetching trailer ${id}:`, err);
           return null;
         }
       })
     );
 
     const validTrailers = trailers.filter((t): t is Trailer => t !== null);
-    console.log(`Loaded ${validTrailers.length} favorites for user:`, userId);
+    console.log(`✅ Loaded ${validTrailers.length} favorites for user:`, userId);
     
     return validTrailers;
   } catch (error) {
-    console.error('Exception in fetchFavorites:', error);
+    console.error('❌ Exception in fetchFavorites:', error);
     return [];
   }
 }
@@ -286,7 +312,7 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
 /* ========= Fetch Watchlist ========= */
 export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
   if (!userId) {
-    console.log('No user ID provided to fetchWatchlist');
+    console.log('❌ No user ID provided to fetchWatchlist');
     return [];
   }
 
@@ -297,46 +323,49 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
       .eq("user_id", userId);
     
     if (error) {
-      console.error('Error fetching watchlist:', error);
+      console.error('❌ Error fetching watchlist:', error);
       return [];
     }
 
     const ids = (data || []).map((r: any) => String(r.trailer_id));
     
     if (ids.length === 0) {
-      console.log('No watchlist items found for user:', userId);
+      console.log('ℹ️ No watchlist items found for user:', userId);
       return [];
     }
+
+    console.log('📥 Fetching watchlist trailers for IDs:', ids);
 
     // Fetch trailer details for each watchlist item
     const trailers = await Promise.all(
       ids.map(async (id) => {
         try {
-          const { data: trailer, error: trailerError } = await supabase
-            .from("trailers")
-            .select("id,title,youtube_id,category,poster_url")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (trailerError || !trailer) {
-            console.warn(`Trailer not found for watchlist: ${id}`);
+          const trailer = await getMovieById(id);
+          if (!trailer) {
+            console.warn(`❌ Trailer not found for watchlist: ${id}`);
             return null;
           }
-          
-          return trailer as Trailer;
+
+          // Ensure poster URL is valid
+          if (!isValidPosterUrl(trailer.poster_url)) {
+            trailer.poster_url = getDefaultPosterUrl();
+          }
+
+          console.log('✅ Loaded watchlist trailer:', trailer.title);
+          return trailer;
         } catch (err) {
-          console.warn(`Error fetching trailer ${id}:`, err);
+          console.warn(`❌ Exception fetching trailer ${id}:`, err);
           return null;
         }
       })
     );
 
     const validTrailers = trailers.filter((t): t is Trailer => t !== null);
-    console.log(`Loaded ${validTrailers.length} watchlist items for user:`, userId);
+    console.log(`✅ Loaded ${validTrailers.length} watchlist items for user:`, userId);
     
     return validTrailers;
   } catch (error) {
-    console.error('Exception in fetchWatchlist:', error);
+    console.error('❌ Exception in fetchWatchlist:', error);
     return [];
   }
 }
@@ -512,5 +541,96 @@ export async function clearUserData(userId: string): Promise<{ success: boolean;
   }
 }
 
+/* ========= Clean Invalid Watchlist/Favorites ========= */
+export async function cleanInvalidUserData(userId: string): Promise<{ 
+  success: boolean; 
+  cleanedWatchlist: number; 
+  cleanedFavorites: number;
+  message: string 
+}> {
+  if (!userId) {
+    return { success: false, cleanedWatchlist: 0, cleanedFavorites: 0, message: 'No user ID provided' };
+  }
+
+  try {
+    console.log('🧹 Cleaning invalid data for user:', userId);
+    
+    let cleanedWatchlist = 0;
+    let cleanedFavorites = 0;
+
+    // Clean watchlist: Remove entries where trailer doesn't exist or has invalid data
+    const { data: watchlistData, error: watchlistError } = await supabase
+      .from('watchlist')
+      .select('id, trailer_id')
+      .eq('user_id', userId);
+
+    if (watchlistError) throw watchlistError;
+
+    if (watchlistData && watchlistData.length > 0) {
+      for (const item of watchlistData) {
+        const trailer = await getMovieById(item.trailer_id);
+
+        // If trailer doesn't exist or has invalid data, remove the watchlist entry
+        if (!trailer || !isValidPosterUrl(trailer.poster_url)) {
+          const { error } = await supabase
+            .from('watchlist')
+            .delete()
+            .eq('id', item.id);
+          
+          if (!error) {
+            cleanedWatchlist++;
+            console.log(`🗑️ Removed invalid watchlist item: ${item.trailer_id}`);
+          }
+        }
+      }
+    }
+
+    // Clean favorites: Remove entries where trailer doesn't exist or has invalid data
+    const { data: favoritesData, error: favoritesError } = await supabase
+      .from('favorites')
+      .select('id, trailer_id')
+      .eq('user_id', userId);
+
+    if (favoritesError) throw favoritesError;
+
+    if (favoritesData && favoritesData.length > 0) {
+      for (const item of favoritesData) {
+        const trailer = await getMovieById(item.trailer_id);
+
+        // If trailer doesn't exist or has invalid data, remove the favorites entry
+        if (!trailer || !isValidPosterUrl(trailer.poster_url)) {
+          const { error } = await supabase
+            .from('favorites')
+            .delete()
+            .eq('id', item.id);
+          
+          if (!error) {
+            cleanedFavorites++;
+            console.log(`🗑️ Removed invalid favorite item: ${item.trailer_id}`);
+          }
+        }
+      }
+    }
+
+    const message = `Cleaned ${cleanedWatchlist} invalid watchlist items and ${cleanedFavorites} invalid favorite items`;
+    console.log('✅', message);
+    
+    return { 
+      success: true, 
+      cleanedWatchlist, 
+      cleanedFavorites, 
+      message 
+    };
+  } catch (error) {
+    console.error('❌ Exception in cleanInvalidUserData:', error);
+    return { 
+      success: false, 
+      cleanedWatchlist: 0, 
+      cleanedFavorites: 0, 
+      message: `Failed to clean user data: ${error}` 
+    };
+  }
+}
+
 // Export for debugging
-export const __DATA_MODULE = "DATA_MODULE_V2_FIXED";
+export const __DATA_MODULE = "DATA_MODULE_V7_NO_LOCAL_DATA_REMOVED_GET_TRAILER";

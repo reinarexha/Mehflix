@@ -4,7 +4,6 @@ import { useUser } from '../hooks/useUser'
 import {
   toggleFavorite,
   toggleWatchlist,
-  getTrailerById,
   fetchFavorites,
   fetchWatchlist,
   type Trailer,
@@ -36,18 +35,6 @@ function relativeDate(from: Date): string {
   return `${diffWeeks}w ago`
 }
 
-// Extract YouTube ID helper
-function extractYoutubeId(url: string): string {
-  try {
-    const u = new URL(url)
-    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v') || ''
-    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1)
-    return url
-  } catch {
-    return url
-  }
-}
-
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([])
   const [query, setQuery] = useState('')
@@ -70,6 +57,7 @@ export default function Home() {
       if (error) {
         console.error('Error fetching movies:', error)
       } else {
+        console.log('🎬 Loaded movies:', data?.length)
         setMovies(data || [])
       }
       setLoading(false)
@@ -94,6 +82,7 @@ export default function Home() {
         if (!mounted) return
         setFavoriteIds(new Set(favs.map(t => t.id)))
         setWatchlistIds(new Set(wls.map(t => t.id)))
+        console.log('⭐ Loaded user data - Favorites:', favs.length, 'Watchlist:', wls.length)
       } catch (e) {
         console.error('Failed to load favorites/watchlist', e)
       }
@@ -142,8 +131,126 @@ export default function Home() {
     })
     .slice(0, 10)
 
-  if (loading) return <p>Loading movies from Supabase...</p>
-  if (!movies.length) return <p>No movies found.</p>
+  async function handleFavorite(id: number) {
+    if (userLoading) return showToast('Checking sign-in status…')
+    if (!user) return showToast('Please sign in to favorite movies')
+    
+    const movie = movies.find(m => m.id === id)
+    if (!movie) {
+      console.error('❌ Movie not found:', id)
+      return showToast('Movie not found')
+    }
+
+    console.log('⭐ Toggle favorite for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
+
+    const next = new Set(favoriteIds)
+    const isFav = next.has(id.toString())
+    
+    if (isFav) {
+      next.delete(id.toString())
+    } else {
+      next.add(id.toString())
+    }
+    
+    setFavoriteIds(next)
+
+    try {
+      // Validate poster URL
+      let posterUrl = movie.poster_url || ''
+      if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
+        console.warn('⚠️ Invalid poster URL, using placeholder')
+        posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
+      }
+
+      // Create proper trailer object from the actual movie data
+      const trailer: Trailer = {
+        id: movie.id.toString(),
+        title: movie.title || 'Unknown Title',
+        youtube_id: movie.id.toString(),
+        category: movie.genre || 'Unknown',
+        poster_url: posterUrl
+      }
+
+      console.log('🎬 Creating trailer object:', {
+        id: trailer.id,
+        title: trailer.title,
+        poster_url: trailer.poster_url
+      })
+      
+      const result = await toggleFavorite(user.id, trailer)
+      console.log('✅ Favorite toggle result:', result)
+      
+      showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
+    } catch (e: any) {
+      // Revert UI on error
+      const revert = new Set(favoriteIds)
+      setFavoriteIds(revert)
+      console.error('❌ Failed to update favorite:', e)
+      showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
+    }
+  }
+
+  async function handleWatchlist(id: number) {
+    if (userLoading) return showToast('Checking sign-in status…')
+    if (!user) return showToast('Please sign in to manage watchlist')
+    
+    const movie = movies.find(m => m.id === id)
+    if (!movie) {
+      console.error('❌ Movie not found:', id)
+      return showToast('Movie not found')
+    }
+
+    console.log('📺 Toggle watchlist for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
+
+    const next = new Set(watchlistIds)
+    const inList = next.has(id.toString())
+    
+    if (inList) {
+      next.delete(id.toString())
+    } else {
+      next.add(id.toString())
+    }
+    
+    setWatchlistIds(next)
+
+    try {
+      // Validate poster URL
+      let posterUrl = movie.poster_url || ''
+      if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
+        console.warn('⚠️ Invalid poster URL, using placeholder')
+        posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
+      }
+
+      // Create proper trailer object from the actual movie data
+      const trailer: Trailer = {
+        id: movie.id.toString(),
+        title: movie.title || 'Unknown Title',
+        youtube_id: movie.id.toString(),
+        category: movie.genre || 'Unknown',
+        poster_url: posterUrl
+      }
+
+      console.log('🎬 Creating trailer object:', {
+        id: trailer.id,
+        title: trailer.title,
+        poster_url: trailer.poster_url
+      })
+      
+      const result = await toggleWatchlist(user.id, trailer)
+      console.log('✅ Watchlist toggle result:', result)
+      
+      showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
+    } catch (e: any) {
+      // Revert UI on error
+      const revert = new Set(watchlistIds)
+      setWatchlistIds(revert)
+      console.error('❌ Failed to update watchlist:', e)
+      showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
+    }
+  }
+
+  if (loading) return <p className="text-white text-center">Loading movies from Supabase...</p>
+  if (!movies.length) return <p className="text-white text-center">No movies found.</p>
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', padding: '1rem' }}>
@@ -225,7 +332,7 @@ export default function Home() {
         title="Coming Soon"
         movies={comingSoon}
         ctaLabel="Remind me"
-        onRemind={(date) => showToast(`You’ll be reminded when this movie releases on ${date}! 🍿`)}
+        onRemind={(date) => showToast(`You'll be reminded when this movie releases on ${date}! 🍿`)}
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}
         onFavorite={handleFavorite}
@@ -262,55 +369,9 @@ export default function Home() {
       )}
     </main>
   )
-
-  async function handleFavorite(id: number) {
-    if (userLoading) return showToast('Checking sign-in status…')
-    if (!user) return showToast('Please sign in to favorite movies')
-    const next = new Set(favoriteIds)
-    const isFav = next.has(id.toString())
-    if (isFav) next.delete(id.toString()); else next.add(id.toString())
-    setFavoriteIds(next)
-    try {
-      const movie = movies.find(m => m.id === id)
-      const trailer: Trailer = getTrailerById(id.toString()) ?? {
-        id: id.toString(),
-        title: movie?.title ?? 'Unknown',
-        youtube_id: '',
-        category: movie?.genre ?? 'Unknown',
-        poster_url: movie?.poster_url ?? ''
-      }
-      await toggleFavorite(user.id, trailer)
-      showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
-    } catch (e: any) {
-      showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
-    }
-  }
-
-  async function handleWatchlist(id: number) {
-    if (userLoading) return showToast('Checking sign-in status…')
-    if (!user) return showToast('Please sign in to manage watchlist')
-    const next = new Set(watchlistIds)
-    const inList = next.has(id.toString())
-    if (inList) next.delete(id.toString()); else next.add(id.toString())
-    setWatchlistIds(next)
-    try {
-      const movie = movies.find(m => m.id === id)
-      const trailer: Trailer = getTrailerById(id.toString()) ?? {
-        id: id.toString(),
-        title: movie?.title ?? 'Unknown',
-        youtube_id: '',
-        category: movie?.genre ?? 'Unknown',
-        poster_url: movie?.poster_url ?? ''
-      }
-      await toggleWatchlist(user.id, trailer)
-      showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
-    } catch (e: any) {
-      showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
-    }
-  }
 }
 
-// Section component (unchanged)
+// Section component
 function Section({
   title, movies, ctaLabel, onRemind, isRelative, favoriteIds, watchlistIds, onFavorite, onWatchlist
 }: {
@@ -326,7 +387,7 @@ function Section({
 }) {
   return (
     <section style={{ marginBottom: '2.5rem' }}>
-      <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600 }}>{title}</h2>
+      <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{title}</h2>
       <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem', scrollSnapType: 'x mandatory' }}>
         {movies.map((m) => {
           const release = m.release_date ? new Date(m.release_date) : new Date()
@@ -336,7 +397,7 @@ function Section({
               <Link to={`/movie/${m.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block', flex: 1 }}>
                 <img src={m.poster_url} alt={m.title ?? ''} style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block' }} />
                 <div style={isRelative ? { padding: '0.5rem 0.75rem', minHeight: 62, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' } : { padding: '0.5rem 0.75rem' }}>
-                  <div style={{ fontWeight: 600 }}>{m.title ?? 'Untitled'}</div>
+                  <div style={{ fontWeight: 600, color: 'white' }}>{m.title ?? 'Untitled'}</div>
                   {isRelative ? (
                     <div style={{ fontSize: '0.875rem', color: 'var(--color-muted)' }}>{relativeDate(release)}</div>
                   ) : (
@@ -349,7 +410,7 @@ function Section({
                   {onWatchlist && (
                     <button
                       title="Add to watchlist"
-                      onClick={(e) => { e.preventDefault(); onWatchlist(m.id) }}
+                      onClick={(e) => { e.preventDefault(); onWatchlist!(m.id) }}
                       style={{
                         flex: 1,
                         display: 'grid',
@@ -370,7 +431,7 @@ function Section({
                   {onFavorite && (
                     <button
                       title="Add to favorites"
-                      onClick={(e) => { e.preventDefault(); onFavorite(m.id) }}
+                      onClick={(e) => { e.preventDefault(); onFavorite!(m.id) }}
                       style={{
                         flex: 1,
                         display: 'grid',

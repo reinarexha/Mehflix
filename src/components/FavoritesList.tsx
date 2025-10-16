@@ -1,93 +1,116 @@
-// src/components/FavoritesList.tsx
-import React, { useEffect, useState } from 'react'
-import MovieCard from './MovieCard'
-import type { Trailer } from '../lib/data'
-import { getTrailerById, toggleFavorite, fetchFavorites } from '../lib/data'
-import { useUser } from '../hooks/useUser'
+import { useState, useEffect } from "react";
+import { useUser } from "../context/UserContext";
+import type { Trailer } from "../lib/data"; // Type-only import
+import { fetchFavorites, toggleFavorite, getMovieById } from "../lib/data"; // Import the actual functions
 
-const FavoritesList: React.FC = () => {
-  const { user } = useUser()
-  const [trailers, setTrailers] = useState<Trailer[]>([])
-  const [unknownIds, setUnknownIds] = useState<string[]>([])
+const FavoritesList = () => {
+  const { user } = useUser();
+  const [favorites, setFavorites] = useState<Trailer[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return
-
-    const fetchFavoritesLocal = async () => {
-      try {
-        const rows = await fetchFavorites(user.id)
-        // fetchFavorites returns Trailer[] (may include placeholders)
-        const known = rows.filter(r => r && r.id) as Trailer[]
-        setTrailers(known)
-        // unknownIds are those with empty title/poster (heuristic)
-        setUnknownIds(known.filter(r => !r.title || r.title === 'Unavailable').map(r => r.id))
-      } catch (err) {
-        console.error(err)
+    const loadFavorites = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        return;
       }
-    }
 
-  fetchFavoritesLocal()
-  }, [user])
+      try {
+        setLoading(true);
+        const userFavorites = await fetchFavorites(user.id);
+        setFavorites(userFavorites);
+      } catch (error) {
+        console.error("Error loading favorites:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFavorites();
+  }, [user?.id]);
 
   const handleRemoveFavorite = async (trailerId: string) => {
-    if (!user) return
+    if (!user?.id) return;
+
     try {
-      const trailer = getTrailerById(trailerId)
-      if (trailer) {
-        await toggleFavorite(user.id, trailer)
-        setTrailers(prev => prev.filter(t => t.id !== trailerId))
-        return
+      // Get the trailer first
+      const trailer = await getMovieById(trailerId);
+      if (!trailer) {
+        console.error("Trailer not found:", trailerId);
+        return;
       }
 
-      // Fallback: construct a minimal trailer object so toggleFavorite can remove the favorite
-      const minimal: Trailer = {
-        id: trailerId,
-        title: 'Unavailable',
-        youtube_id: trailerId,
-        category: 'Unknown',
-        poster_url: '/posters/placeholder.jpg',
-      }
-      await toggleFavorite(user.id, minimal)
-      setUnknownIds(prev => prev.filter(id => id !== trailerId))
-    } catch (err) {
-      console.error(err)
+      // Toggle favorite to remove it
+      await toggleFavorite(user.id, trailer);
+      
+      // Update local state
+      setFavorites(prev => prev.filter(t => t.id !== trailerId));
+    } catch (error) {
+      console.error("Error removing favorite:", error);
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+      </div>
+    );
   }
 
-  if (!user) return <p className="text-white">Please log in to see favorites.</p>
-
-  if (trailers.length === 0 && unknownIds.length === 0)
-    return <p className="text-white">You have no favorite trailers.</p>
+  if (favorites.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No favorites yet. Start adding some movies to your favorites!
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4">
-      {trailers.map(trailer => (
-        <MovieCard
-          key={trailer.id}
-          trailer={trailer}
-          userId={user.id}
-          showDate={false}
-          onRemoveFavorite={() => handleRemoveFavorite(trailer.id)}
-        />
-      ))}
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      {favorites.map((trailer) => (
+        <div key={trailer.id} className="relative group">
+          <div className="aspect-[2/3] bg-gray-800 rounded-lg overflow-hidden">
+            <img
+              src={trailer.poster_url}
+              alt={trailer.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = `data:image/svg+xml;base64,${btoa(`
+                  <svg width="300" height="450" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="#374151"/>
+                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" 
+                          font-family="Arial, sans-serif" font-size="16" fill="white">
+                      No Poster
+                    </text>
+                  </svg>
+                `)}`;
+              }}
+            />
+          </div>
+          
+          <div className="mt-2">
+            <h3 className="font-semibold text-white text-sm truncate">
+              {trailer.title}
+            </h3>
+            <p className="text-gray-400 text-xs">{trailer.category}</p>
+          </div>
 
-      {unknownIds.map(id => (
-        <div
-          key={`unknown-${id}`}
-          className="bg-gray-800 rounded overflow-hidden flex flex-col items-center justify-center p-4 text-white"
-        >
-          <div className="text-sm mb-2">Unavailable item</div>
-          <div className="text-xs mb-3 break-all">ID: {id}</div>
+          {/* Remove button */}
           <button
-            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-            onClick={() => handleRemoveFavorite(id)}
+            onClick={() => handleRemoveFavorite(trailer.id)}
+            className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove from favorites"
           >
-            Remove
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
           </button>
         </div>
       ))}
     </div>
-  )
-}
+  );
+};
 
-export default FavoritesList
+export default FavoritesList;
