@@ -10,7 +10,7 @@ import Home from './pages/Home';
 import Categories from './pages/Categories';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
-import Movie from './pages/Movie';
+import Movie from './components/Movie';
 import CategoryPage from './pages/Category';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
