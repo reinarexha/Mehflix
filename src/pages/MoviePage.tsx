@@ -1,10 +1,10 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import Movie from "../components/Movie";
 import { useMovie } from "../hooks/useMovie";
 import { useParams } from "react-router-dom";
 import { useUser } from "../hooks/useUser";
 import {
-  getTrailerById,
+  getMovieById,
   toggleFavorite,
   toggleWatchlist,
   fetchFavorites,
@@ -16,27 +16,36 @@ export default function MoviePage() {
   const { id } = useParams();
   const movieId = Number(id);
   const { user } = useUser();
-  const userId = user?.id ?? "";
 
   const { movie, loading } = useMovie(movieId);
 
   // Derive display fields and trailer from movie/local data
-  const trailer: Trailer | null = useMemo(() => {
-    if (!movie) return null;
+  const [trailer, setTrailer] = useState<Trailer | null>(null);
+
+useEffect(() => {
+  if (!movie) return;
+
+  let mounted = true;
+
+  const fetchLocalTrailer = async () => {
     const baseId = String(movie.id ?? id ?? "");
-    const local = getTrailerById(baseId);
-    const youtube_id = local?.youtube_id || baseId;
-    const category: string = (movie.genre || movie.category || local?.category || "Unknown").toString();
-    return {
+    const local = await getMovieById(baseId); // async!
+    if (!mounted) return;
+
+    setTrailer({
       id: baseId,
       title: movie.title || local?.title || "Untitled Movie",
-      youtube_id,
-      category,
+      youtube_id: local?.youtube_id || baseId,
+      category: (movie.genre || movie.category || local?.category || "Unknown").toString(),
       poster_url: movie.poster_url || local?.poster_url || "",
-    };
-  }, [movie, id]);
+    });
+  };
 
-  // Favorite / Watchlist state
+  fetchLocalTrailer();
+
+  return () => { mounted = false; };
+}, [movie, id]);
+
   const [isFav, setIsFav] = useState(false);
   const [inList, setInList] = useState(false);
 
@@ -80,7 +89,6 @@ export default function MoviePage() {
         </div>
 
         <div className="grid grid-cols-12 gap-6 items-start">
-          {/* Poster */}
           <div className="col-span-12 md:col-span-4">
             {trailer.poster_url ? (
               <img
@@ -94,7 +102,6 @@ export default function MoviePage() {
             )}
           </div>
 
-          {/* Video + Overview */}
           <div className="col-span-12 md:col-span-8">
             <div className="w-full aspect-video bg-black/40 rounded-lg overflow-hidden shadow-lg">
               <iframe
@@ -106,21 +113,17 @@ export default function MoviePage() {
               />
             </div>
 
-            {/* Overview */}
             <div className="mt-4 bg-[#2A2660] text-white/90 rounded-lg px-4 py-3">
               <p>{movie.overview || movie.description || "A retired operative returns for one last mission."}</p>
             </div>
           </div>
         </div>
 
-        {/* Actions */}
         <div className="mt-6 flex flex-wrap gap-3">
           <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Rate</button>
           <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Comment</button>
           <button
-            className={`font-medium px-4 py-2 rounded-lg ${
-              isFav ? 'bg-purple-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
-            }`}
+            className={`font-medium px-4 py-2 rounded-lg ${isFav ? 'bg-purple-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
             onClick={async () => {
               if (!user) return alert("Please sign in to favorite");
               setIsFav((v) => !v);
@@ -130,9 +133,7 @@ export default function MoviePage() {
             {isFav ? "Favorited" : "Add to favorites"}
           </button>
           <button
-            className={`font-medium px-4 py-2 rounded-lg ${
-              inList ? 'bg-indigo-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
-            }`}
+            className={`font-medium px-4 py-2 rounded-lg ${inList ? 'bg-indigo-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
             onClick={async () => {
               if (!user) return alert("Please sign in to add to watch list");
               setInList((v) => !v);
@@ -143,9 +144,8 @@ export default function MoviePage() {
           </button>
         </div>
 
-        {/* Keep existing comments UI */}
         <div className="mt-8">
-          <Movie movie={movie} userId={userId} />
+          <Movie movie={movie} userId={user?.id ?? ""} />
         </div>
       </div>
     </main>

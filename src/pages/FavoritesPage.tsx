@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMovieById, toggleFavorite, fetchFavorites } from "../lib/data";
+import { toggleFavorite, fetchFavorites } from "../lib/data";
 import type { Trailer } from "../lib/data";
 
 export default function FavoritesPage({ userId }: { userId: string }) {
