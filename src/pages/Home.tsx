@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useUser } from '../hooks/useUser'
 import {
@@ -6,8 +6,8 @@ import {
   toggleWatchlist,
   fetchFavorites,
   fetchWatchlist,
-  type Trailer,
 } from '../lib/data'
+import type { Trailer } from '../lib/trailers'
 import { supabase } from '../lib/supabaseClient'
 
 type Movie = {
@@ -37,6 +37,8 @@ function relativeDate(from: Date): string {
 
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([])
+  const [comingSoonDb, setComingSoonDb] = useState<Movie[]>([])
+  const [newReleasesDb, setNewReleasesDb] = useState<Movie[]>([])
   const [query, setQuery] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [toastVisible, setToastVisible] = useState(false)
@@ -46,26 +48,76 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   // Fetch movies from Supabase
-  useEffect(() => {
-    const fetchMovies = async () => {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('movies')
-        .select('*')
-        .order('release_date', { ascending: false })
+useEffect(() => {
+  const fetchMovies = async () => {
+    setLoading(true)
 
-      if (error) {
-        console.error('Error fetching movies:', error)
-      } else {
-        console.log('🎬 Loaded movies:', data?.length)
-        setMovies(data || [])
-      }
+    try {
+      const [allMovies, comingSoon, newReleases] = await Promise.all([
+        supabase.from('movies').select('*').order('release_date', { ascending: false }),
+        supabase.from('upcoming_movies').select('*').order('release_date', { ascending: true }),
+        supabase.from('new_releases').select('*').order('release_date', { ascending: false }),
+      ])
+
+      if (allMovies.error) throw allMovies.error
+      if (comingSoon.error) throw comingSoon.error
+      if (newReleases.error) throw newReleases.error
+
+      console.log('🎬 Loaded:', {
+        movies: allMovies.data?.length,
+        comingSoon: comingSoon.data?.length,
+        newReleases: newReleases.data?.length,
+      })
+
+      setMovies(allMovies.data || [])
+      setComingSoonDb(comingSoon.data || [])
+      setNewReleasesDb(newReleases.data || [])
+    } catch (err) {
+      console.error('❌ Error fetching data:', err)
+    } finally {
       setLoading(false)
     }
-    fetchMovies()
-  }, [])
+  }
 
-  // Initialize favorites/watchlist from server when user logs in
+  fetchMovies()
+}, [])
+
+
+    // Fetch Coming Soon and New Releases directly from DB
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const today = new Date();
+        const toStr = (d: Date) => d.toISOString().slice(0, 10);
+        const todayStr = toStr(today);
+        const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const agoStr = toStr(twoWeeksAgo);
+
+        const [coming, releases] = await Promise.all([
+          supabase
+            .from('movies')
+            .select('*')
+            .gt('release_date', todayStr)
+            .order('release_date', { ascending: true })
+            .limit(20),
+          supabase
+            .from('movies')
+            .select('*')
+            .gte('release_date', agoStr)
+            .lte('release_date', todayStr)
+            .order('release_date', { ascending: false })
+            .limit(20),
+        ]);
+
+        if (!coming.error && coming.data) setComingSoonDb(coming.data as Movie[]);
+        if (!releases.error && releases.data) setNewReleasesDb(releases.data as Movie[]);
+      } catch (e) {
+        console.warn('Failed to fetch section lists', e);
+      }
+    };
+    run();
+  }, []);
+// Initialize favorites/watchlist from server when user logs in
   useEffect(() => {
     let mounted = true
     async function load() {
@@ -82,7 +134,7 @@ export default function Home() {
         if (!mounted) return
         setFavoriteIds(new Set(favs.map(t => t.id)))
         setWatchlistIds(new Set(wls.map(t => t.id)))
-        console.log('⭐ Loaded user data - Favorites:', favs.length, 'Watchlist:', wls.length)
+        console.log('â­ Loaded user data - Favorites:', favs.length, 'Watchlist:', wls.length)
       } catch (e) {
         console.error('Failed to load favorites/watchlist', e)
       }
@@ -91,13 +143,23 @@ export default function Home() {
     return () => { mounted = false }
   }, [user])
 
+  // Store timeouts as refs to avoid any type casting
+  const toastTimers = {
+    hideTimer: 0,
+    removeTimer: 0
+  }
+
   const showToast = (message: string) => {
     setToast(message)
     setToastVisible(true)
-    window.clearTimeout((showToast as any)._t1)
-    window.clearTimeout((showToast as any)._t2)
-    ;(showToast as any)._t1 = window.setTimeout(() => setToastVisible(false), 5000)
-    ;(showToast as any)._t2 = window.setTimeout(() => setToast(null), 5400)
+    
+    // Clear existing timers
+    window.clearTimeout(toastTimers.hideTimer)
+    window.clearTimeout(toastTimers.removeTimer)
+    
+    // Set new timers
+    toastTimers.hideTimer = window.setTimeout(() => setToastVisible(false), 5000)
+    toastTimers.removeTimer = window.setTimeout(() => setToast(null), 5400)
   }
 
   // Filter for search
@@ -110,38 +172,30 @@ export default function Home() {
     .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
     .slice(0, 10)
 
-  const comingSoon = movies
-    .filter(m =>
-      m.release_date &&
-      new Date(m.release_date) > new Date() &&
-      !popular.some(p => p.id === m.id)
-    )
+  const comingSoonLocal = movies
+    .filter(m => m.release_date && new Date(m.release_date) > new Date() && !popular.some(p => p.id === m.id))
     .slice(0, 10)
 
-  const newReleases = movies
+  const newReleasesLocal = movies
     .filter(m => {
       if (!m.release_date) return false
       const d = new Date(m.release_date)
       const diff = (new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
-      return (
-        diff <= 14 &&
-        !popular.some(p => p.id === m.id) &&
-        !comingSoon.some(c => c.id === m.id)
-      )
+      return diff <= 14 && !popular.some(p => p.id === m.id)
     })
     .slice(0, 10)
 
   async function handleFavorite(id: number) {
-    if (userLoading) return showToast('Checking sign-in status…')
+    if (userLoading) return showToast('Checking sign-in statusâ€¦')
     if (!user) return showToast('Please sign in to favorite movies')
     
     const movie = movies.find(m => m.id === id)
     if (!movie) {
-      console.error('❌ Movie not found:', id)
+      console.error('âŒ Movie not found:', id)
       return showToast('Movie not found')
     }
 
-    console.log('⭐ Toggle favorite for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
+    console.log('â­ Toggle favorite for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
 
     const next = new Set(favoriteIds)
     const isFav = next.has(id.toString())
@@ -158,7 +212,7 @@ export default function Home() {
       // Validate poster URL
       let posterUrl = movie.poster_url || ''
       if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
-        console.warn('⚠️ Invalid poster URL, using placeholder')
+        console.warn('âš ï¸ Invalid poster URL, using placeholder')
         posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
       }
 
@@ -171,36 +225,36 @@ export default function Home() {
         poster_url: posterUrl
       }
 
-      console.log('🎬 Creating trailer object:', {
+      console.log('ðŸŽ¬ Creating trailer object:', {
         id: trailer.id,
         title: trailer.title,
         poster_url: trailer.poster_url
       })
       
       const result = await toggleFavorite(user.id, trailer)
-      console.log('✅ Favorite toggle result:', result)
+      console.log('âœ… Favorite toggle result:', result)
       
       showToast(isFav ? 'Removed from Favorites' : 'Added to Favorites')
-    } catch (e: any) {
+    } catch (error) {
       // Revert UI on error
       const revert = new Set(favoriteIds)
       setFavoriteIds(revert)
-      console.error('❌ Failed to update favorite:', e)
-      showToast(`Failed to update favorite: ${e?.message ?? 'error'}`)
+      console.error('âŒ Failed to update favorite:', error)
+      showToast(`Failed to update favorite: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   async function handleWatchlist(id: number) {
-    if (userLoading) return showToast('Checking sign-in status…')
+    if (userLoading) return showToast('Checking sign-in statusâ€¦')
     if (!user) return showToast('Please sign in to manage watchlist')
     
     const movie = movies.find(m => m.id === id)
     if (!movie) {
-      console.error('❌ Movie not found:', id)
+      console.error('âŒ Movie not found:', id)
       return showToast('Movie not found')
     }
 
-    console.log('📺 Toggle watchlist for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
+    console.log('ðŸ“º Toggle watchlist for movie:', movie.title, 'ID:', movie.id, 'Poster:', movie.poster_url)
 
     const next = new Set(watchlistIds)
     const inList = next.has(id.toString())
@@ -217,7 +271,7 @@ export default function Home() {
       // Validate poster URL
       let posterUrl = movie.poster_url || ''
       if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
-        console.warn('⚠️ Invalid poster URL, using placeholder')
+        console.warn('âš ï¸ Invalid poster URL, using placeholder')
         posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
       }
 
@@ -230,22 +284,22 @@ export default function Home() {
         poster_url: posterUrl
       }
 
-      console.log('🎬 Creating trailer object:', {
+      console.log('ðŸŽ¬ Creating trailer object:', {
         id: trailer.id,
         title: trailer.title,
         poster_url: trailer.poster_url
       })
       
       const result = await toggleWatchlist(user.id, trailer)
-      console.log('✅ Watchlist toggle result:', result)
+      console.log('âœ… Watchlist toggle result:', result)
       
       showToast(inList ? 'Removed from Watchlist' : 'Added to Watchlist')
-    } catch (e: any) {
+    } catch (error) {
       // Revert UI on error
       const revert = new Set(watchlistIds)
       setWatchlistIds(revert)
-      console.error('❌ Failed to update watchlist:', e)
-      showToast(`Failed to update watchlist: ${e?.message ?? 'error'}`)
+      console.error('âŒ Failed to update watchlist:', error)
+      showToast(`Failed to update watchlist: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -330,9 +384,9 @@ export default function Home() {
 
       <Section
         title="Coming Soon"
-        movies={comingSoon}
+        movies={comingSoonDb.length ? comingSoonDb : comingSoonLocal}
         ctaLabel="Remind me"
-        onRemind={(date) => showToast(`You'll be reminded when this movie releases on ${date}! 🍿`)}
+        onRemind={(date) => showToast(`You'll be reminded when this movie releases on ${date}! `)}
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}
         onFavorite={handleFavorite}
@@ -341,7 +395,7 @@ export default function Home() {
 
       <Section
         title="New Releases"
-        movies={newReleases}
+        movies={newReleasesDb.length ? newReleasesDb : newReleasesLocal}
         isRelative
         favoriteIds={favoriteIds}
         watchlistIds={watchlistIds}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getMovieById, toggleFavorite, fetchFavorites } from "../lib/data";
-import type { Trailer } from "../lib/data";
+import { toggleFavorite, fetchFavorites } from "../lib/data";
+import type { Trailer } from "../lib/trailers";
 
 export default function FavoritesPage({ userId }: { userId: string }) {
   const [favorites, setFavorites] = useState<Trailer[]>([]);

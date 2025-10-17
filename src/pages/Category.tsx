@@ -49,7 +49,7 @@ function normalize(s: string) {
 // Demo IDs to make posters clickable to trailer page
 const demoYouTubeIds = [
   'dQw4w9WgXcQ', '3JZ_D3ELwOQ', 'hY7m5jjJ9mM', 'kxopViU98Xo', '9bZkp7q19f0',
-  , 'CevxZvSJLk8', 'RgKAFK5djSk', 'OPf0YbXqDm0', '60ItHLz5WEA'
+  'CevxZvSJLk8', 'RgKAFK5djSk', 'OPf0YbXqDm0', '60ItHLz5WEA'
 ]
 
 

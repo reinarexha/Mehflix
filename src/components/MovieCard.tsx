@@ -1,6 +1,6 @@
-// src/components/MovieCard.tsx
+﻿// src/components/MovieCard.tsx
 import React from 'react'
-import type { Trailer } from '../lib/data'
+import type { Trailer } from '../lib/trailers'
 
 type MovieCardProps = {
   /** prefer using `movie`; `trailer` is kept for backward-compat */

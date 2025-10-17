@@ -39,7 +39,7 @@ async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
 
     // If trailer exists, update it with validated data
     if (existingTrailer) {
-      // console.log('🔄 Updating existing trailer:', validatedTrailer.id, validatedTrailer.title);
+      console.log('🔄 Updating existing trailer:', validatedTrailer.id, validatedTrailer.title);
       const { error } = await supabase
         .from('trailers')
         .update({
@@ -51,29 +51,29 @@ async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
         .eq('id', validatedTrailer.id);
       
       if (error) {
-        // console.error('❌ Error updating trailer:', error);
+        console.error('❌ Error updating trailer:', error);
         return false;
       }
-      // console.log('✅ Updated trailer:', validatedTrailer.id, validatedTrailer.title);
+      console.log('✅ Updated trailer:', validatedTrailer.id, validatedTrailer.title);
       return true;
     }
 
     // If trailer doesn't exist, create it
-    // console.log('🚀 Creating new trailer:', validatedTrailer);
+    console.log('🚀 Creating new trailer:', validatedTrailer);
     
     const { error } = await supabase
       .from('trailers')
       .insert([validatedTrailer]);
       
     if (error) {
-      // console.error('❌ Error creating trailer:', error);
+      console.error('❌ Error creating trailer:', error);
       return false;
     }
     
-    // console.log('✅ Created new trailer:', validatedTrailer.id, validatedTrailer.title);
+    console.log('✅ Created new trailer:', validatedTrailer.id, validatedTrailer.title);
     return true;
   } catch (error) {
-    // console.error('❌ Exception in ensureTrailerExists:', error);
+    console.error('❌ Exception in ensureTrailerExists:', error);
     return false;
   }
 }
@@ -107,7 +107,7 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
   }
 
   try {
-    // console.log('🎬 Toggle watchlist for:', trailer.title, 'ID:', trailer.id);
+    console.log('🎬 Toggle watchlist for:', trailer.title, 'ID:', trailer.id);
 
     // Check if already in watchlist
     const { data, error } = await supabase
@@ -127,12 +127,12 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
         .eq("id", data.id);
         
       if (delErr) throw delErr;
-      // console.log('❌ Removed from watchlist:', trailer.title);
+      console.log('❌ Removed from watchlist:', trailer.title);
       return { inWatchlist: false };
     }
 
     // If doesn't exist, add it - but first ensure trailer exists with valid data
-    // console.log('👨‍💼 Ensuring trailer exists before adding to watchlist...');
+    console.log('👨‍💼 Ensuring trailer exists before adding to watchlist...');
     const ensured = await ensureTrailerExists(trailer);
     if (!ensured) {
       throw new Error('Failed to ensure trailer exists in database');
@@ -146,14 +146,14 @@ export async function toggleWatchlist(userId: string, trailer: Trailer): Promise
       });
 
     if (insErr) {
-      // console.error('❌ Error adding to watchlist:', insErr);
+      console.error('❌ Error adding to watchlist:', insErr);
       throw insErr;
     }
 
-    // console.log('✅ Added to watchlist:', trailer.title);
+    console.log('✅ Added to watchlist:', trailer.title);
     return { inWatchlist: true };
   } catch (error) {
-    // console.error('❌ Error in toggleWatchlist:', error);
+    console.error('❌ Error in toggleWatchlist:', error);
     throw error;
   }
 }
@@ -165,7 +165,7 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
   }
 
   try {
-    // console.log('⭐ Toggle favorite for:', trailer.title, 'ID:', trailer.id);
+    console.log('⭐ Toggle favorite for:', trailer.title, 'ID:', trailer.id);
 
     // Check if already in favorites
     const { data, error } = await supabase
@@ -185,12 +185,12 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
         .eq("id", data.id);
         
       if (delErr) throw delErr;
-      // console.log('❌ Removed from favorites:', trailer.title);
+      console.log('❌ Removed from favorites:', trailer.title);
       return { favorited: false };
     }
 
     // If doesn't exist, add it - but first ensure trailer exists with valid data
-    // console.log('👨‍💼 Ensuring trailer exists before adding to favorites...');
+    console.log('👨‍💼 Ensuring trailer exists before adding to favorites...');
     const ensured = await ensureTrailerExists(trailer);
     if (!ensured) {
       throw new Error('Failed to ensure trailer exists in database');
@@ -204,14 +204,14 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
       });
 
     if (insErr) {
-      // console.error('❌ Error adding to favorites:', insErr);
+      console.error('❌ Error adding to favorites:', insErr);
       throw insErr;
     }
 
-    // console.log('✅ Added to favorites:', trailer.title);
+    console.log('✅ Added to favorites:', trailer.title);
     return { favorited: true };
   } catch (error) {
-    // console.error('❌ Error in toggleFavorite:', error);
+    console.error('❌ Error in toggleFavorite:', error);
     throw error;
   }
 }
@@ -219,7 +219,7 @@ export async function toggleFavorite(userId: string, trailer: Trailer): Promise<
 /* ========= Fetch Favorites ========= */
 export async function fetchFavorites(userId: string): Promise<Trailer[]> {
   if (!userId) {
-    // console.log('❌ No user ID provided to fetchFavorites');
+    console.log('❌ No user ID provided to fetchFavorites');
     return [];
   }
 
@@ -230,7 +230,7 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
       .eq("user_id", userId);
     
     if (error) {
-      // console.error('❌ Error fetching favorites:', error);
+      console.error('❌ Error fetching favorites:', error);
       return [];
     }
 
@@ -238,11 +238,11 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
     const ids = (data || []).map((r: ListRow) => String(r.trailer_id));
     
     if (ids.length === 0) {
-      // console.log('ℹ️ No favorites found for user:', userId);
+      console.log('ℹ️ No favorites found for user:', userId);
       return [];
     }
 
-    // console.log('📥 Fetching favorite trailers for IDs:', ids);
+    console.log('📥 Fetching favorite trailers for IDs:', ids);
 
     // Fetch trailer details for each favorite
     const trailers = await Promise.all(
@@ -250,7 +250,7 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
         try {
           const trailer = await getMovieById(id);
           if (!trailer) {
-            // console.warn(`❌ Trailer not found for favorite: ${id}`);
+            console.warn(`❌ Trailer not found for favorite: ${id}`);
             return null;
           }
 
@@ -259,21 +259,21 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
             trailer.poster_url = getDefaultPosterUrl();
           }
 
-          // console.log('✅ Loaded favorite trailer:', trailer.title);
+          console.log('✅ Loaded favorite trailer:', trailer.title);
           return trailer;
         } catch (err) {
-          // console.warn(`❌ Exception fetching trailer ${id}:`, err);
+          console.warn(`❌ Exception fetching trailer ${id}:`, err);
           return null;
         }
       })
     );
 
     const validTrailers = trailers.filter((t): t is Trailer => t !== null);
-    // console.log(`✅ Loaded ${validTrailers.length} favorites for user:`, userId);
+    console.log(`✅ Loaded ${validTrailers.length} favorites for user:`, userId);
     
     return validTrailers;
   } catch (error) {
-    // console.error('❌ Exception in fetchFavorites:', error);
+    console.error('❌ Exception in fetchFavorites:', error);
     return [];
   }
 }
@@ -281,7 +281,7 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
 /* ========= Fetch Watchlist ========= */
 export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
   if (!userId) {
-    // console.log('❌ No user ID provided to fetchWatchlist');
+    console.log('❌ No user ID provided to fetchWatchlist');
     return [];
   }
 
@@ -292,7 +292,7 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
       .eq("user_id", userId);
     
     if (error) {
-      // console.error('❌ Error fetching watchlist:', error);
+      console.error('❌ Error fetching watchlist:', error);
       return [];
     }
 
@@ -300,11 +300,11 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
     const ids = (data || []).map((r: ListRow) => String(r.trailer_id));
     
     if (ids.length === 0) {
-      // console.log('ℹ️ No watchlist items found for user:', userId);
+      console.log('ℹ️ No watchlist items found for user:', userId);
       return [];
     }
 
-    // console.log('📥 Fetching watchlist trailers for IDs:', ids);
+    console.log('📥 Fetching watchlist trailers for IDs:', ids);
 
     // Fetch trailer details for each watchlist item
     const trailers = await Promise.all(
@@ -312,7 +312,7 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
         try {
           const trailer = await getMovieById(id);
           if (!trailer) {
-            // console.warn(`❌ Trailer not found for watchlist: ${id}`);
+            console.warn(`❌ Trailer not found for watchlist: ${id}`);
             return null;
           }
 
@@ -321,21 +321,21 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
             trailer.poster_url = getDefaultPosterUrl();
           }
 
-          // console.log('✅ Loaded watchlist trailer:', trailer.title);
+          console.log('✅ Loaded watchlist trailer:', trailer.title);
           return trailer;
         } catch (err) {
-          // console.warn(`❌ Exception fetching trailer ${id}:`, err);
+          console.warn(`❌ Exception fetching trailer ${id}:`, err);
           return null;
         }
       })
     );
 
     const validTrailers = trailers.filter((t): t is Trailer => t !== null);
-    // console.log(`✅ Loaded ${validTrailers.length} watchlist items for user:`, userId);
+    console.log(`✅ Loaded ${validTrailers.length} watchlist items for user:`, userId);
     
     return validTrailers;
   } catch (error) {
-    // console.error('❌ Exception in fetchWatchlist:', error);
+    console.error('❌ Exception in fetchWatchlist:', error);
     return [];
   }
 }
@@ -357,7 +357,7 @@ export async function addComment(userId: string, trailerId: string, content: str
       
     if (error) throw error;
   } catch (error) {
-    // console.error('Error adding comment:', error);
+    console.error('Error adding comment:', error);
     throw error;
   }
 }
@@ -398,7 +398,7 @@ export async function fetchComments(trailerId: string): Promise<CommentRow[]> {
       likes: likeCounts.get(c.id) ?? 0 
     }));
   } catch (error) {
-    // console.error('Error fetching comments:', error);
+    console.error('Error fetching comments:', error);
     return [];
   }
 }
@@ -443,7 +443,7 @@ export async function toggleLikeComment(userId: string, commentId: string): Prom
 
     return { liked: true };
   } catch (error) {
-    // console.error('Error in toggleLikeComment:', error);
+    console.error('Error in toggleLikeComment:', error);
     throw error;
   }
 }
@@ -461,7 +461,7 @@ export async function removeWatchlistRow(rowId: string): Promise<boolean> {
     if (error) throw error;
     return true;
   } catch (error) {
-    // console.error('Error removing watchlist row:', error);
+    console.error('Error removing watchlist row:', error);
     throw error;
   }
 }
@@ -473,7 +473,7 @@ export async function clearUserData(userId: string): Promise<{ success: boolean;
   }
 
   try {
-    // console.log('🧹 Clearing data for user:', userId);
+    console.log('🧹 Clearing data for user:', userId);
     
     // Delete all watchlist entries for this user
     const { error: watchlistError, count: watchlistCount } = await supabase
@@ -482,7 +482,7 @@ export async function clearUserData(userId: string): Promise<{ success: boolean;
       .eq('user_id', userId);
     
     if (watchlistError) {
-      // console.error('Error clearing watchlist:', watchlistError);
+      console.error('Error clearing watchlist:', watchlistError);
       throw watchlistError;
     }
 
@@ -493,18 +493,18 @@ export async function clearUserData(userId: string): Promise<{ success: boolean;
       .eq('user_id', userId);
     
     if (favoritesError) {
-      // console.error('Error clearing favorites:', favoritesError);
+      console.error('Error clearing favorites:', favoritesError);
       throw favoritesError;
     }
 
-    // console.log(`✅ Cleared ${watchlistCount} watchlist items and ${favoritesCount} favorites for user:`, userId);
+    console.log(`✅ Cleared ${watchlistCount} watchlist items and ${favoritesCount} favorites for user:`, userId);
     
     return { 
       success: true, 
       message: `Cleared ${watchlistCount} watchlist items and ${favoritesCount} favorites` 
     };
   } catch (error) {
-    // console.error('Exception in clearUserData:', error);
+    console.error('Exception in clearUserData:', error);
     return { 
       success: false, 
       message: `Failed to clear user data: ${error}` 
@@ -524,7 +524,7 @@ export async function cleanInvalidUserData(userId: string): Promise<{
   }
 
   try {
-    // console.log('🧹 Cleaning invalid data for user:', userId);
+    console.log('🧹 Cleaning invalid data for user:', userId);
     
     let cleanedWatchlist = 0;
     let cleanedFavorites = 0;
@@ -550,7 +550,7 @@ export async function cleanInvalidUserData(userId: string): Promise<{
           
           if (!error) {
             cleanedWatchlist++;
-            // console.log(`🗑️ Removed invalid watchlist item: ${item.trailer_id}`);
+            console.log(`🗑️ Removed invalid watchlist item: ${item.trailer_id}`);
           }
         }
       }
@@ -577,14 +577,14 @@ export async function cleanInvalidUserData(userId: string): Promise<{
           
           if (!error) {
             cleanedFavorites++;
-            // console.log(`🗑️ Removed invalid favorite item: ${item.trailer_id}`);
+            console.log(`🗑️ Removed invalid favorite item: ${item.trailer_id}`);
           }
         }
       }
     }
 
     const message = `Cleaned ${cleanedWatchlist} invalid watchlist items and ${cleanedFavorites} invalid favorite items`;
-    // console.log('✅', message);
+    console.log('✅', message);
     
     return { 
       success: true, 
@@ -593,7 +593,7 @@ export async function cleanInvalidUserData(userId: string): Promise<{
       message 
     };
   } catch (error) {
-    // console.error('❌ Exception in cleanInvalidUserData:', error);
+    console.error('❌ Exception in cleanInvalidUserData:', error);
     return { 
       success: false, 
       cleanedWatchlist: 0, 

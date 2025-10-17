@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useUser } from '../hooks/useUser'
-import { supabase } from '../lib/supabaseClient'
+﻿import { useEffect, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { useUser } from "../hooks/useUser"
+import { supabase } from "../lib/supabaseClient"
 import {
-  getMovieById,
   fetchWatchlist,
   fetchFavorites,
   clearUserData,
   cleanInvalidUserData
 } from '../lib/data'
+import { getMovieById } from '../lib/trailers'
 
 type Trailer = {
   id: string
@@ -128,15 +128,15 @@ const Profile: React.FC = () => {
 
     setMoviesLoading(true)
     try {
-      console.log('🔄 Loading movies for user:', user.id)
+      console.log('ðŸ”„ Loading movies for user:', user.id)
 
       const [wl, favs] = await Promise.all([
         fetchWatchlist(user.id),
         fetchFavorites(user.id)
       ])
 
-      console.log('📥 Raw watchlist data:', wl)
-      console.log('📥 Raw favorites data:', favs)
+      console.log('ðŸ“¥ Raw watchlist data:', wl)
+      console.log('ðŸ“¥ Raw favorites data:', favs)
 
       const validWatchlist = wl.filter(
         (trailer) =>
@@ -158,13 +158,13 @@ const Profile: React.FC = () => {
           !trailer.poster_url.includes('placeholder.com')
       )
 
-      console.log('✅ Valid watchlist count:', validWatchlist.length)
-      console.log('✅ Valid favorites count:', validFavorites.length)
+      console.log('âœ… Valid watchlist count:', validWatchlist.length)
+      console.log('âœ… Valid favorites count:', validFavorites.length)
 
       setWatchlist(validWatchlist)
       setFavorites(validFavorites)
     } catch (e) {
-      console.error('❌ Failed to load movies', e)
+      console.error('âŒ Failed to load movies', e)
       setWatchlist([])
       setFavorites([])
     } finally {
@@ -190,13 +190,13 @@ const Profile: React.FC = () => {
     try {
       const result = await cleanInvalidUserData(user.id)
       if (result.success) {
-        alert(`✅ ${result.message}`)
+        alert(`âœ… ${result.message}`)
         await loadMovies()
       } else {
-        alert(`❌ ${result.message}`)
+        alert(`âŒ ${result.message}`)
       }
     } catch (error) {
-      alert('❌ Failed to clean data')
+      alert('âŒ Failed to clean data')
       console.error('Error cleaning data:', error)
     } finally {
       setCleaningData(false)
@@ -217,13 +217,13 @@ const Profile: React.FC = () => {
     try {
       const result = await clearUserData(user.id)
       if (result.success) {
-        alert(`✅ ${result.message}`)
+        alert(`âœ… ${result.message}`)
         await loadMovies()
       } else {
-        alert(`❌ ${result.message}`)
+        alert(`âŒ ${result.message}`)
       }
     } catch (error) {
-      alert('❌ Failed to clear data')
+      alert('âŒ Failed to clear data')
       console.error('Error clearing data:', error)
     } finally {
       setClearingData(false)
@@ -324,7 +324,7 @@ const Profile: React.FC = () => {
             <div className="text-gray-300 text-center py-8">Loading...</div>
           ) : watchlist.length === 0 ? (
             <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
-              <div className="text-xl mb-2">📺</div>
+              <div className="text-xl mb-2">ðŸ“º</div>
               <div>No movies in watchlist</div>
               <div className="text-sm mt-2 text-gray-500">
                 Add movies from the home page to see them here
@@ -339,7 +339,7 @@ const Profile: React.FC = () => {
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
-                      console.warn('❌ Image failed to load:', m.title, m.poster_url)
+                      console.warn('âŒ Image failed to load:', m.title, m.poster_url)
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}
@@ -363,7 +363,7 @@ const Profile: React.FC = () => {
             <div className="text-gray-300 text-center py-8">Loading...</div>
           ) : favorites.length === 0 ? (
             <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
-              <div className="text-xl mb-2">⭐</div>
+              <div className="text-xl mb-2">â­</div>
               <div>No favorite movies</div>
               <div className="text-sm mt-2 text-gray-500">
                 Favorite movies from the home page to see them here
@@ -378,7 +378,7 @@ const Profile: React.FC = () => {
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
-                      console.warn('❌ Image failed to load:', m.title, m.poster_url)
+                      console.warn('âŒ Image failed to load:', m.title, m.poster_url)
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}
@@ -404,7 +404,7 @@ const Profile: React.FC = () => {
             <div className="text-gray-300 text-center py-8">Loading...</div>
           ) : notifications.length === 0 ? (
             <div className="text-gray-400 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
-              <div className="text-xl mb-2">🔔</div>
+              <div className="text-xl mb-2">ðŸ””</div>
               <div>No notifications yet</div>
               <div className="text-sm mt-2 text-gray-500">
                 You'll get notifications when others interact with your comments
@@ -427,7 +427,7 @@ const Profile: React.FC = () => {
                     to={n.movieLink}
                     className="text-blue-400 hover:text-blue-300 text-sm font-medium inline-block bg-blue-900/20 px-3 py-1 rounded"
                   >
-                    Go to movie →
+                    Go to movie â†’
                   </Link>
                 </div>
               ))}

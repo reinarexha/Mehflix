@@ -1,105 +1,101 @@
-// src/pages/EditInfo.jsx
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useUser } from "../hooks/useUser";
 
-type Props = {
-  userId?: string
-}
+type MessageType = {
+  text: string;
+  type: "success" | "error";
+};
 
-export default function EditInfo(_props: Props) {
+export default function EditInfoPage() {
+  const { user: currentUser } = useUser();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<MessageType>({ text: "", type: "success" });
 
-  // Fetch current user and profile
+  // Load initial profile data
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        setMessage("Failed to fetch user info");
-        setLoading(false);
+    async function loadProfile() {
+      if (!currentUser) {
+        setMessage({ text: "Please sign in to edit your profile", type: "error" });
         return;
       }
 
-  setEmail(user.email ?? "");
+      setLoading(true);
+      try {
+        setEmail(currentUser.email ?? "");
 
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", user.id)
-        .single();
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", currentUser.id)
+          .single();
 
-      if (profileError) {
-        console.log("Profile row not found. It will be created on update.");
-        setUsername(""); // Empty if profile missing
-      } else {
-        setUsername(profileData.username);
+        if (error) {
+          console.log("Profile not found, will create on save");
+          setUsername("");
+        } else {
+          setUsername(data.username ?? "");
+        }
+      } catch (err) {
+        setMessage({ text: err instanceof Error ? err.message : "Failed to load profile", type: "error" });
+      } finally {
+        setLoading(false);
       }
+    }
 
-      setLoading(false);
-    };
+    loadProfile();
+  }, [currentUser]);
 
-    fetchProfile();
-  }, []);
-
-  // Update or create username
+  // Handle username updates
   const updateUsername = async () => {
-    setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setMessage("User not logged in");
-      setLoading(false);
+    if (!currentUser) {
+      setMessage({ text: "Please sign in", type: "error" });
       return;
     }
 
-    // Try updating first
-    const { error, count } = await supabase
-      .from("profiles")
-      .update({ username })
-      .eq("id", user.id);
-
-    if (error) {
-      setMessage(error.message);
-    } else if (count === 0) {
-      // No row existed, create it
-      const { error: insertError } = await supabase
-        .from("profiles")
-        .insert({ id: user.id, username });
-
-      if (insertError) setMessage(insertError.message);
-      else setMessage("Profile row created and username updated!");
-      // Notify other parts of the app that profile changed
-      // Also persist username into the auth user metadata so other code can read it
-      try {
-        await supabase.auth.updateUser({ data: { username } })
-      } catch (e) {
-        console.warn('Failed to update auth user metadata', e)
-      }
-      // Refresh auth user data for other parts of the app
-      try {
-        await supabase.auth.getUser()
-        window.dispatchEvent(new CustomEvent('auth:refreshed'))
-      } catch (e) {
-        console.warn('Failed to refresh auth user after update', e)
-      }
-      window.dispatchEvent(new CustomEvent('profile:updated', { detail: { username } }))
-    } else {
-      setMessage("Username updated successfully!");
-      try {
-        await supabase.auth.updateUser({ data: { username } })
-        await supabase.auth.getUser()
-        window.dispatchEvent(new CustomEvent('auth:refreshed'))
-      } catch (e) {
-        console.warn('Failed to update auth user metadata', e)
-      }
-      // Notify other parts of the app that profile changed
-      window.dispatchEvent(new CustomEvent('profile:updated', { detail: { username } }))
+    if (!username.trim()) {
+      setMessage({ text: "Username cannot be empty", type: "error" });
+      return;
     }
 
-    setLoading(false);
+    setLoading(true);
+    try {
+      const { error, count } = await supabase
+        .from("profiles")
+        .update({ username, updated_at: new Date().toISOString() })
+        .eq("id", currentUser.id);
+
+      if (error) throw error;
+
+      if (count === 0) {
+        // No row existed, create it
+        const { error: insertError } = await supabase
+          .from("profiles")
+          .insert({ id: currentUser.id, username });
+
+        if (insertError) throw insertError;
+
+        setMessage({ text: "Profile created and username updated!", type: "success" });
+      } else {
+        setMessage({ text: "Username updated successfully!", type: "success" });
+      }
+
+      // Update auth metadata and trigger refresh
+      await supabase.auth.updateUser({ data: { username } });
+      await supabase.auth.getUser();
+      window.dispatchEvent(new CustomEvent("auth:refreshed"));
+      window.dispatchEvent(new CustomEvent("profile:updated", { detail: { username } }));
+    } catch (error) {
+      setMessage({ 
+        text: error instanceof Error ? error.message : "Failed to update username",
+        type: "error"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Update email
@@ -107,8 +103,11 @@ export default function EditInfo(_props: Props) {
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ email });
 
-    if (error) setMessage(error.message);
-    else setMessage("Email updated! Check your inbox to confirm.");
+    if (error) {
+      setMessage({ text: error.message, type: "error" });
+    } else {
+      setMessage({ text: "Email update initiated! Check your inbox to confirm.", type: "success" });
+    }
     setLoading(false);
   };
 
@@ -116,15 +115,18 @@ export default function EditInfo(_props: Props) {
   const updatePassword = async () => {
     setLoading(true);
     if (!newPassword) {
-      setMessage("Password cannot be empty");
+      setMessage({ text: "Password cannot be empty", type: "error" });
       setLoading(false);
       return;
     }
 
     const { error } = await supabase.auth.updateUser({ password: newPassword });
 
-    if (error) setMessage(error.message);
-    else setMessage("Password updated successfully!");
+    if (error) {
+      setMessage({ text: error.message, type: "error" });
+    } else {
+      setMessage({ text: "Password updated successfully!", type: "success" });
+    }
 
     setNewPassword("");
     setLoading(false);
@@ -134,7 +136,11 @@ export default function EditInfo(_props: Props) {
     <div className="max-w-md mx-auto mt-10 p-6 border rounded-lg shadow bg-gray-800 text-white">
       <h2 className="text-2xl font-bold mb-4">Edit Info</h2>
 
-      {message && <p className="mb-4 text-green-400">{message}</p>}
+      {message.text && (
+        <p className={`mb-4 ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>
+          {message.text}
+        </p>
+      )}
 
       <div className="mb-4">
         <label className="block mb-1 font-medium">Username</label>

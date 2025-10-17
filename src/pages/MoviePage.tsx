@@ -4,13 +4,12 @@ import { useMovie } from "../hooks/useMovie";
 import { useParams } from "react-router-dom";
 import { useUser } from "../hooks/useUser";
 import {
-  getTrailerById,
   toggleFavorite,
   toggleWatchlist,
   fetchFavorites,
   fetchWatchlist,
-  type Trailer,
 } from "../lib/data";
+import type { Trailer } from "../lib/trailers";
 
 export default function MoviePage() {
   const { id } = useParams();
@@ -23,16 +22,15 @@ export default function MoviePage() {
   // Derive display fields and trailer from movie/local data
   const trailer: Trailer | null = useMemo(() => {
     if (!movie) return null;
-    const baseId = String(movie.id ?? id ?? "");
-    const local = getTrailerById(baseId);
-    const youtube_id = local?.youtube_id || baseId;
-    const category: string = (movie.genre || movie.category || local?.category || "Unknown").toString();
+    const baseId = String((movie as any).id ?? id ?? "");
+    const youtube_id = baseId;
+    const category: string = String((movie as any).genre ?? (movie as any).category ?? "Unknown");
     return {
       id: baseId,
-      title: movie.title || local?.title || "Untitled Movie",
+      title: (movie as any).title ?? "Untitled Movie",
       youtube_id,
       category,
-      poster_url: movie.poster_url || local?.poster_url || "",
+      poster_url: (movie as any).poster_url ?? "",
     };
   }, [movie, id]);
 
@@ -64,8 +62,8 @@ export default function MoviePage() {
   if (loading) return <p>Loading movie from database...</p>;
   if (!movie || !trailer) return <p>Movie not found!</p>;
 
-  const year = movie.release_date ? new Date(movie.release_date).getFullYear() : "";
-  const rank = Math.max(1, (movie.popularity ? Math.round(100 - Math.min(99, movie.popularity % 100)) : 5));
+  const rd = (movie as any)?.release_date; const year = (typeof rd === "string" || typeof rd === "number") ? (new Date(rd).getFullYear() || "") : "";
+  const popRaw = (movie as any)?.popularity; const pop = typeof popRaw === "number" ? popRaw : Number(popRaw ?? 5); const rank = Math.max(1, Math.round(100 - Math.min(99, (isFinite(pop) ? (pop % 100) : 5))));
   const youtubeSrc = `https://www.youtube.com/embed/${trailer.youtube_id}?autoplay=0&rel=0&modestbranding=1`;
 
   return (
@@ -108,7 +106,7 @@ export default function MoviePage() {
 
             {/* Overview */}
             <div className="mt-4 bg-[#2A2660] text-white/90 rounded-lg px-4 py-3">
-              <p>{movie.overview || movie.description || "A retired operative returns for one last mission."}</p>
+              <p>{(movie as any).overview || (movie as any).description || "A retired operative returns for one last mission."}</p>
             </div>
           </div>
         </div>

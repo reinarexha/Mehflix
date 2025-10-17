@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
+type Movie = Record<string, unknown>;
+
 export function useMovie(movieId: number) {
-  const [movie, setMovie] = useState<any | null>(null);
+  const [movie, setMovie] = useState<Movie | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

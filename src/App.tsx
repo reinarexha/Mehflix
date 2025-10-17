@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import { Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import { useUser } from './hooks/useUser';
@@ -38,8 +38,7 @@ const ChangePasswordPageWrapper: React.FC = () => {
   return <ChangePasswordPage userId={user ? user.id : ''} />
 }
 const EditInfoPageWrapper: React.FC = () => {
-  const { user } = useUser()
-  return <EditInfoPage userId={user ? user.id : ''} />
+  return <EditInfoPage />
 }
 const PersonalInfoPageWrapper: React.FC = () => {
   const { user } = useUser()

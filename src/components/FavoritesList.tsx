@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
-import { useUser } from "../context/UserContext";
-import type { Trailer } from "../lib/data"; // Type-only import
-import { fetchFavorites, toggleFavorite, getMovieById } from "../lib/data"; // Import the actual functions
+﻿import { useState, useEffect } from "react";
+import { useUser } from "../hooks/useUser";
+import type { Trailer } from "../lib/trailers"; // Type-only import
+import { fetchFavorites, toggleFavorite } from "../lib/data";
+import { getMovieById } from "../lib/trailers"; // Import the actual functions
 
 const FavoritesList = () => {
   const { user } = useUser();

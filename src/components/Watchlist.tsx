@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { getMovieById, fetchWatchlist, toggleWatchlist, removeWatchlistRow } from "../lib/data";
-import type { Trailer } from "../lib/data";
+﻿import { useEffect, useState } from "react";
+import { fetchWatchlist, toggleWatchlist, removeWatchlistRow } from "../lib/data";
+import type { Trailer } from "../lib/trailers";
 
 export default function Watchlist({ userId }: { userId: string }) {
   const [watchlist, setWatchlist] = useState<Trailer[]>([]);

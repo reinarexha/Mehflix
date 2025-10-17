@@ -3,19 +3,17 @@ import { useLocation, useParams } from "react-router-dom";
 import { useUser } from "../hooks/useUser";
 import { supabase } from "../lib/supabaseClient";
 import {
-  getMovieById,
   toggleFavorite,
   toggleWatchlist,
   fetchFavorites,
   fetchWatchlist,
-  toggleLikeComment,
   type CommentRow,
-  type Trailer,
 } from "../lib/data";
+import { getMovieById, type Trailer } from "../lib/trailers";
 
 // ---- Types ----
 type RouteState = { title?: string; year?: string; poster?: string; rank?: number } | null;
-type DisplayComment = CommentRow & { commenterUsername?: string | null; _unsynced?: boolean; _error?: string | null };
+type DisplayComment = CommentRow & { commenterUsername?: string | null; _unsynced?: boolean; _error?: string | null; };
 type SupabaseComment = {
   id: string;
   user_id: string;
@@ -32,22 +30,23 @@ export default function MovieDetailPage() {
   const videoId = id || "";
   const location = useLocation();
   const routeState = (location.state as RouteState) ?? null;
+
   const [movieData, setMovieData] = useState<Trailer | null>(null);
 
-  // Load movie from DB for richer details
   useEffect(() => {
     async function loadMovie() {
-      try {
-        const data = await getMovieById(videoId);
-        setMovieData(data);
-      } catch (error) {
-        console.error("Failed to load movie:", error);
+      if (videoId) {
+        try {
+          const data = await getMovieById(videoId);
+          setMovieData(data);
+        } catch (error) {
+          console.error("Failed to load movie:", error);
+        }
       }
     }
-    if (videoId) loadMovie();
+    loadMovie();
   }, [videoId]);
 
-  // Build display trailer with route fallbacks
   const trailer = useMemo(() => ({
     id: movieData?.id || videoId,
     title: routeState?.title || movieData?.title || "Untitled Movie",
@@ -56,8 +55,8 @@ export default function MovieDetailPage() {
     youtube_id: movieData?.youtube_id || videoId,
     category: movieData?.category || "Drama",
     poster_url: routeState?.poster || movieData?.poster_url || "https://via.placeholder.com/360x540?text=No+Poster",
-    summary: "No summary available for this movie yet.",
-  }), [videoId, routeState, movieData]);
+    summary: "No summary available for this movie yet.", // always fallback
+  }), [movieData, videoId, routeState]);
 
   const src = `https://www.youtube.com/embed/${trailer.youtube_id}?autoplay=0&rel=0&modestbranding=1`;
 
@@ -66,23 +65,22 @@ export default function MovieDetailPage() {
   const [comments, setComments] = useState<DisplayComment[]>([]);
   const [newComment, setNewComment] = useState("");
 
-  // Load favorite/watchlist state
   useEffect(() => {
     async function loadStatus() {
       if (!user || !videoId) return;
       try {
         const favs = await fetchFavorites(user.id);
         const wls = await fetchWatchlist(user.id);
-        setIsFav(favs.some((t) => t.youtube_id === trailer.youtube_id || t.id === trailer.id));
-        setInList(wls.some((t) => t.youtube_id === trailer.youtube_id || t.id === trailer.id));
+        setIsFav(favs.some((t) => t.youtube_id === trailer.youtube_id));
+        setInList(wls.some((t) => t.youtube_id === trailer.youtube_id));
       } catch (e) {
         console.error("Failed to load favorite/watchlist status", e);
       }
     }
     loadStatus();
-  }, [user, videoId, trailer.id, trailer.youtube_id]);
+  }, [user, videoId, trailer.youtube_id]);
 
-  // Fetch comments with joined profile username
+  // --- Fix fetchComments typing and useCallback ---
   const fetchComments = useCallback(async (): Promise<DisplayComment[]> => {
     const { data, error } = await supabase
       .from("comments")
@@ -112,11 +110,9 @@ export default function MovieDetailPage() {
   }, [videoId]);
 
   useEffect(() => {
-    if (!videoId) return;
     fetchComments().then(setComments);
   }, [videoId, fetchComments]);
 
-  // Add a new comment with optimistic UI
   async function addComment(userId: string, trailerIdentifier: string, content: string) {
     try {
       const { data, error } = await supabase
@@ -124,7 +120,6 @@ export default function MovieDetailPage() {
         .insert([{ user_id: userId, trailer_id: trailerIdentifier, content }])
         .select("id, user_id, trailer_id, content, created_at, likes, commenter:profiles(username)");
       if (error) throw error;
-
       const r = (data?.[0] ?? {}) as SupabaseComment;
       let commenterUsername: string | null = null;
       if (Array.isArray(r.commenter) && r.commenter.length > 0 && typeof r.commenter[0] === 'object') {
@@ -149,12 +144,19 @@ export default function MovieDetailPage() {
     }
   }
 
+  async function toggleLikeComment(commentId: string) {
+    const { data: existing } = await supabase.from("comments").select("likes").eq("id", commentId).maybeSingle();
+    const current = (existing?.likes ?? 0) as number;
+    await supabase.from("comments").update({ likes: current + 1 }).eq("id", commentId);
+  }
+
   // Placeholder cast and similar
   const cast = Array.from({ length: 8 }).map((_, i) => ({
     id: i,
     name: i % 2 === 0 ? "Reina Holt" : "Aron Vega",
     role: i % 2 === 0 ? "Main Actor" : "Director",
   }));
+
   const similar = Array.from({ length: 8 }).map((_, i) => ({
     id: i,
     title: `Movie ${i + 1}`,
@@ -184,7 +186,7 @@ export default function MovieDetailPage() {
                 isFav ? "bg-purple-600" : "bg-white/10 border border-white/10 hover:bg-white/15"
               }`}
             >
-              {isFav ? "Favorited" : "Add to Favorites"}
+              {isFav ? "Favorited ❤️" : "Add to Favorites"}
             </button>
 
             <button
@@ -201,7 +203,7 @@ export default function MovieDetailPage() {
                 inList ? "bg-indigo-600" : "bg-white/10 border border-white/10 hover:bg-white/15"
               }`}
             >
-              {inList ? "In Watchlist" : "Add to Watchlist"}
+              {inList ? "In Watchlist 🎬" : "Add to Watchlist"}
             </button>
           </div>
 
@@ -306,7 +308,7 @@ export default function MovieDetailPage() {
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Write a comment..."
-                className="flex-1 px-4 py-2 rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-100"
+                className="flex-1 px-4 py-2 rounded-lg text-black bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <button
                 type="submit"
@@ -316,7 +318,6 @@ export default function MovieDetailPage() {
               </button>
             </form>
 
-            {/* Comments list */}
             <div className="space-y-3">
               {comments.map((c) => (
                 <div key={c.id} className="bg-white/5 border border-white/10 p-4 rounded-lg">
@@ -334,26 +335,12 @@ export default function MovieDetailPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-sm text-pink-400 font-semibold">❤ {c.likes ?? 0}</div>
+                    <div className="text-sm text-pink-400 font-semibold">❤️ {c.likes ?? 0}</div>
                   </div>
                   <p className="text-gray-100">{c.content}</p>
                   <button
                     className="mt-2 text-xs bg-pink-700 hover:bg-pink-600 px-3 py-1 rounded font-semibold text-white"
-                    onClick={async () => {
-                      if (!user) return alert("Please sign in to like comments");
-                      setComments((prev) =>
-                        prev.map((x) => (x.id === c.id ? { ...x, likes: (x.likes ?? 0) + 1 } : x))
-                      );
-                      try {
-                        await toggleLikeComment(user!.id, c.id);
-                      } catch {
-                        setComments((prev) =>
-                          prev.map((x) =>
-                            x.id === c.id ? { ...x, likes: Math.max(0, (x.likes ?? 1) - 1) } : x
-                          )
-                        );
-                      }
-                    }}
+                    onClick={() => toggleLikeComment(c.id)}
                   >
                     Like
                   </button>

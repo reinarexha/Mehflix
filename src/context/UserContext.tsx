@@ -1,26 +1,14 @@
-// src/context/UserContext.tsx
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { Session, User } from '@supabase/supabase-js';
-
-type UserContextType = {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-};
-
-const UserContext = createContext<UserContextType>({
-  user: null,
-  session: null,
-  loading: true,
-});
+import { UserContext } from './user.ts';
 
 type Props = {
   children: ReactNode;
 };
 
-export const UserProvider = ({ children }: Props) => {
+export function UserProvider({ children }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,19 +31,19 @@ export const UserProvider = ({ children }: Props) => {
 
     const onAuthRefreshed = async () => {
       try {
-        const { data } = await supabase.auth.getSession()
-        setSession(data.session)
-        setUser(data.session?.user ?? null)
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
       } catch (e) {
-        console.warn('Failed to refresh auth session', e)
+        console.warn('Failed to refresh auth session', e);
       }
-    }
+    };
 
-    window.addEventListener('auth:refreshed', onAuthRefreshed)
+    window.addEventListener('auth:refreshed', onAuthRefreshed);
 
     return () => {
       listener.subscription.unsubscribe();
-      window.removeEventListener('auth:refreshed', onAuthRefreshed)
+      window.removeEventListener('auth:refreshed', onAuthRefreshed);
     };
   }, []);
 
@@ -64,6 +52,4 @@ export const UserProvider = ({ children }: Props) => {
       {children}
     </UserContext.Provider>
   );
-};
-
-export const useUser = () => useContext(UserContext);
+}

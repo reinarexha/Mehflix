@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useUser } from "../hooks/useUser";
 import MovieCard from "../components/MovieCard";
-import { getMovieById, type Trailer } from "../lib/data";
+import { getMovieById, type Trailer } from "../lib/trailers";
 import { supabase } from "../lib/supabaseClient";
 
 const WatchlistPage: React.FC = () => {

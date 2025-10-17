@@ -42,8 +42,12 @@ export default function Auth({ mode: initialMode = 'login' as Mode }) {
         if (err) throw err
         setMessage('Password reset email sent. Please check your inbox.')
       }
-    } catch (err: any) {
-      setError(err.message ?? 'Something went wrong')
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError(String(err) || 'Something went wrong')
+      }
     } finally {
       setLoading(false)
     }
