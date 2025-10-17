@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useUser } from "../hooks/useUser";
@@ -43,11 +44,13 @@ export default function EditInfoPage() {
         setMessage({ text: err instanceof Error ? err.message : "Failed to load profile", type: "error" });
       } finally {
         setLoading(false);
+
       }
     }
 
     loadProfile();
   }, [currentUser]);
+
 
   // Handle username updates
   const updateUsername = async () => {
@@ -116,11 +119,20 @@ export default function EditInfoPage() {
     setLoading(true);
     if (!newPassword) {
       setMessage({ text: "Password cannot be empty", type: "error" });
+
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    // Update password if provided
+    if (newPassword) {
+      const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
+      if (passwordError) {
+        setMessage('Failed to update password: ' + passwordError.message);
+        setLoading(false);
+        return;
+      }
+    }
 
     if (error) {
       setMessage({ text: error.message, type: "error" });
@@ -129,12 +141,14 @@ export default function EditInfoPage() {
     }
 
     setNewPassword("");
+
     setLoading(false);
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 border rounded-lg shadow bg-gray-800 text-white">
-      <h2 className="text-2xl font-bold mb-4">Edit Info</h2>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
+      <div className="bg-gray-800 p-6 rounded-2xl w-full max-w-md flex flex-col gap-4">
+        <h1 className="text-2xl font-bold text-center mb-4">Edit Profile</h1>
 
       {message.text && (
         <p className={`mb-4 ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>
@@ -142,55 +156,16 @@ export default function EditInfoPage() {
         </p>
       )}
 
-      <div className="mb-4">
-        <label className="block mb-1 font-medium">Username</label>
-        <input
-          type="text"
-          className="w-full p-2 border rounded bg-gray-900 text-white"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <button
-          onClick={updateUsername}
-          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-          disabled={loading}
-        >
-          Update Username
-        </button>
-      </div>
 
-      <div className="mb-4">
-        <label className="block mb-1 font-medium">Email</label>
-        <input
-          type="email"
-          className="w-full p-2 border rounded bg-gray-900 text-white"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
         <button
-          onClick={updateEmail}
-          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+          onClick={handleSave}
           disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md mt-2"
         >
-          Update Email
+          {loading ? 'Saving...' : 'Save Changes'}
         </button>
-      </div>
 
-      <div className="mb-4">
-        <label className="block mb-1 font-medium">New Password</label>
-        <input
-          type="password"
-          className="w-full p-2 border rounded bg-gray-900 text-white"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-        />
-        <button
-          onClick={updatePassword}
-          className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-          disabled={loading}
-        >
-          Update Password
-        </button>
+        {message && <p className="text-center mt-2">{message}</p>}
       </div>
     </div>
   );

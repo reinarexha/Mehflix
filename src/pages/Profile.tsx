@@ -2,6 +2,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useUser } from "../hooks/useUser"
 import { supabase } from "../lib/supabaseClient"
+
 import {
   fetchWatchlist,
   fetchFavorites,
@@ -34,6 +35,7 @@ const Profile: React.FC = () => {
   const [cleaningData, setCleaningData] = useState(false)
 
   const navigate = useNavigate()
+  const location = useLocation() // <-- for refresh after EditInfo
 
   // ---------------- Profile ----------------
   const fetchProfile = async () => {
@@ -46,7 +48,7 @@ const Profile: React.FC = () => {
         .maybeSingle()
 
       if (error) console.log('Error fetching profile:', error.message)
-      setUsername(profileData?.username ?? user.email ?? null)
+      setUsername(profileData?.username ?? '')
     } finally {
       setLoading(false)
     }
@@ -54,13 +56,15 @@ const Profile: React.FC = () => {
 
   useEffect(() => {
     fetchProfile()
-  }, [user])
+  }, [user, location.key]) // <-- refresh when navigating back from EditInfo
 
   // ---------------- Notifications ----------------
   useEffect(() => {
     if (!user) return
 
     let mounted = true
+    const cutoffDate = new Date('2025-10-16') // Replace with your DB reset date
+
     const loadNotifications = async () => {
       setNotifLoading(true)
       try {
@@ -82,11 +86,15 @@ const Profile: React.FC = () => {
           .in('comment_id', commentIds)
           .order('created_at', { ascending: false })
 
+        const recentLikes = (likes ?? []).filter(
+          (l) => new Date(l.created_at) >= cutoffDate
+        )
+
         const commentMap: Record<string, any> = {}
         for (const c of commentRows) commentMap[c.id] = c
 
         const items = await Promise.all(
-          (likes ?? []).map(async (l) => {
+          recentLikes.map(async (l) => {
             const comment = commentMap[l.comment_id]
             const trailerId = comment?.trailer_id || null
             const trailer = trailerId ? await getMovieById(trailerId) : undefined
@@ -130,6 +138,7 @@ const Profile: React.FC = () => {
     try {
       console.log('ðŸ”„ Loading movies for user:', user.id)
 
+
       const [wl, favs] = await Promise.all([
         fetchWatchlist(user.id),
         fetchFavorites(user.id)
@@ -137,6 +146,7 @@ const Profile: React.FC = () => {
 
       console.log('ðŸ“¥ Raw watchlist data:', wl)
       console.log('ðŸ“¥ Raw favorites data:', favs)
+
 
       const validWatchlist = wl.filter(
         (trailer) =>
@@ -269,11 +279,9 @@ const Profile: React.FC = () => {
             </div>
 
             <div className="flex-1 text-center md:text-left">
-              <h2 className="text-xl font-bold mb-2">
-                {username || user.email}
-              </h2>
+              <h2 className="text-xl font-bold mb-2">{user.email}</h2>
               <p className="text-gray-400 text-sm mb-4">
-                User ID: {user.id.substring(0, 8)}...
+                Username: {username || 'N/A'}
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
@@ -339,7 +347,9 @@ const Profile: React.FC = () => {
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
+
                       console.warn('âŒ Image failed to load:', m.title, m.poster_url)
+
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}
@@ -378,7 +388,9 @@ const Profile: React.FC = () => {
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
+
                       console.warn('âŒ Image failed to load:', m.title, m.poster_url)
+
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}

@@ -2,6 +2,7 @@
 import { fetchWatchlist, toggleWatchlist, removeWatchlistRow } from "../lib/data";
 import type { Trailer } from "../lib/trailers";
 
+
 export default function Watchlist({ userId }: { userId: string }) {
   const [watchlist, setWatchlist] = useState<Trailer[]>([]);
   const [loading, setLoading] = useState(true);

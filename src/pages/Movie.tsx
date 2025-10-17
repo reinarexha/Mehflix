@@ -27,11 +27,20 @@ type SupabaseComment = {
 export default function MovieDetailPage() {
   const { id } = useParams();
   const { user } = useUser();
+
+  useEffect(() => {
+    if (user) {
+      console.log("Logged-in user ID:", user.id);
+      console.log("Logged-in user email:", user.email);
+    }
+  }, [user]);
+
   const videoId = id || "";
   const location = useLocation();
   const routeState = (location.state as RouteState) ?? null;
 
   const [movieData, setMovieData] = useState<Trailer | null>(null);
+
 
   useEffect(() => {
     async function loadMovie() {
@@ -45,6 +54,7 @@ export default function MovieDetailPage() {
       }
     }
     loadMovie();
+
   }, [videoId]);
 
   const trailer = useMemo(() => ({
@@ -65,6 +75,7 @@ export default function MovieDetailPage() {
   const [comments, setComments] = useState<DisplayComment[]>([]);
   const [newComment, setNewComment] = useState("");
 
+
   useEffect(() => {
     async function loadStatus() {
       if (!user || !videoId) return;
@@ -81,31 +92,26 @@ export default function MovieDetailPage() {
   }, [user, videoId, trailer.youtube_id]);
 
   // --- Fix fetchComments typing and useCallback ---
+
   const fetchComments = useCallback(async (): Promise<DisplayComment[]> => {
     const { data, error } = await supabase
       .from("comments")
       .select("id, user_id, content, created_at, likes, commenter:profiles(username)")
       .eq("trailer_id", videoId)
       .order("created_at", { ascending: false });
+
     if (error) return [];
+
     return (data ?? []).map((r: SupabaseComment) => {
       let commenterUsername: string | null = null;
-      if (Array.isArray(r.commenter) && r.commenter.length > 0 && typeof r.commenter[0] === 'object') {
-        commenterUsername = (r.commenter[0] as { username: string | null }).username ?? null;
-      } else if (r.commenter && typeof r.commenter === 'object') {
+
+      if (Array.isArray(r.commenter) && r.commenter.length > 0) {
+        commenterUsername = r.commenter[0]?.username ?? null;
+      } else if (r.commenter && typeof r.commenter === "object") {
         commenterUsername = (r.commenter as { username: string | null }).username ?? null;
       }
-      return {
-        id: r.id,
-        user_id: r.user_id,
-        trailer_id: r.trailer_id ?? videoId,
-        content: r.content,
-        created_at: r.created_at,
-        likes: r.likes ?? 0,
-        commenterUsername,
-        _unsynced: false,
-        _error: null,
-      } as DisplayComment;
+
+      return { ...r, commenterUsername, _unsynced: false, _error: null } as DisplayComment;
     });
   }, [videoId]);
 
@@ -113,36 +119,28 @@ export default function MovieDetailPage() {
     fetchComments().then(setComments);
   }, [videoId, fetchComments]);
 
+
   async function addComment(userId: string, trailerIdentifier: string, content: string) {
     try {
+      await ensureProfile();
       const { data, error } = await supabase
         .from("comments")
         .insert([{ user_id: userId, trailer_id: trailerIdentifier, content }])
         .select("id, user_id, trailer_id, content, created_at, likes, commenter:profiles(username)");
       if (error) throw error;
       const r = (data?.[0] ?? {}) as SupabaseComment;
+
       let commenterUsername: string | null = null;
-      if (Array.isArray(r.commenter) && r.commenter.length > 0 && typeof r.commenter[0] === 'object') {
-        commenterUsername = (r.commenter[0] as { username: string | null }).username ?? null;
-      } else if (r.commenter && typeof r.commenter === 'object') {
-        commenterUsername = (r.commenter as { username: string | null }).username ?? null;
-      }
-      return {
-        id: r.id,
-        user_id: r.user_id,
-        trailer_id: r.trailer_id ?? trailerIdentifier,
-        content: r.content,
-        created_at: r.created_at,
-        likes: r.likes ?? 0,
-        commenterUsername,
-        _unsynced: false,
-        _error: null,
-      } as DisplayComment;
+      if (Array.isArray(r.commenter) && r.commenter.length > 0) commenterUsername = r.commenter[0]?.username ?? null;
+      else if (r.commenter && typeof r.commenter === "object") commenterUsername = r.commenter.username ?? null;
+
+      return { ...r, commenterUsername, _unsynced: false, _error: null } as DisplayComment;
     } catch (e) {
       console.error("Failed to add comment", e);
       throw e;
     }
   }
+
 
   async function toggleLikeComment(commentId: string) {
     const { data: existing } = await supabase.from("comments").select("likes").eq("id", commentId).maybeSingle();
@@ -163,15 +161,16 @@ export default function MovieDetailPage() {
     poster: "https://via.placeholder.com/150x220?text=Movie",
   }));
 
+
+  // ---- JSX ----
   return (
     <div className="min-h-screen text-white" style={{ backgroundColor: "#151336" }}>
       <div className="max-w-[1200px] mx-auto p-6 flex gap-8">
-        {/* Left column (poster + info) */}
+        {/* Left column */}
         <div className="w-[360px] flex-shrink-0">
           <img src={trailer.poster_url} alt={trailer.title} className="rounded-lg shadow-2xl w-full h-[540px] object-cover" />
-
-          {/* Favorites & Watchlist buttons */}
           <div className="mt-4 flex flex-col gap-2">
+
             <button
               onClick={async () => {
                 if (!user) return alert("Please sign in to favorite");
@@ -233,38 +232,21 @@ export default function MovieDetailPage() {
                 </a>
               ))}
             </div>
+
           </div>
         </div>
 
-        {/* Right column (trailer + summary + comments) */}
+        {/* Right column */}
         <div className="flex-1">
-          <header className="mb-4">
-            <h1 className="text-4xl font-extrabold">{trailer.title}</h1>
-            <div className="text-gray-300 flex gap-3 text-lg">
-              <span>{trailer.year}</span>
-              <span className="text-yellow-400 font-bold">Rank: {trailer.ranking}</span>
-            </div>
-          </header>
-
-          {/* Trailer */}
+          <header className="mb-4"><h1 className="text-4xl font-extrabold">{trailer.title}</h1></header>
           <div className="rounded-lg overflow-hidden shadow-2xl bg-black h-[400px] mb-4">
-            <iframe
-              src={src}
-              title={`${trailer.title} trailer`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="w-full h-full"
-            />
-          </div>
-
-          {/* Summary */}
-          <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-gray-100 mb-8">
-            <p>{trailer.summary}</p>
+            <iframe src={src} title={`${trailer.title} trailer`} allowFullScreen className="w-full h-full" />
           </div>
 
           {/* Comment Section */}
           <section className="max-w-3xl mx-auto mb-10">
             <h3 className="text-2xl font-bold mb-4">Comments</h3>
+
             <form
               className="flex gap-2 mb-4 bg-white/5 p-3 rounded-lg border border-white/10"
               onSubmit={async (e) => {
@@ -319,20 +301,14 @@ export default function MovieDetailPage() {
             </form>
 
             <div className="space-y-3">
-              {comments.map((c) => (
+              {comments.map(c => (
                 <div key={c.id} className="bg-white/5 border border-white/10 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white font-bold">
-                        {(c.commenterUsername ?? c.user_id).slice(0, 1).toUpperCase()}
-                      </div>
+                      <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white font-bold">{(c.commenterUsername ?? c.user_id).slice(0,1).toUpperCase()}</div>
                       <div>
-                        <div className="font-semibold text-purple-200">
-                          {c.commenterUsername ?? c.user_id}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {new Date(c.created_at).toLocaleString()}
-                        </div>
+                        <div className="font-semibold text-purple-200">{c.commenterUsername ?? c.user_id}</div>
+                        <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
                       </div>
                     </div>
                     <div className="text-sm text-pink-400 font-semibold">❤️ {c.likes ?? 0}</div>
@@ -344,6 +320,7 @@ export default function MovieDetailPage() {
                   >
                     Like
                   </button>
+
                 </div>
               ))}
             </div>

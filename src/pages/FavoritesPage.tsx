@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toggleFavorite, fetchFavorites } from "../lib/data";
 import type { Trailer } from "../lib/trailers";
 
+
 export default function FavoritesPage({ userId }: { userId: string }) {
   const [favorites, setFavorites] = useState<Trailer[]>([]);
   const [loading, setLoading] = useState(true);

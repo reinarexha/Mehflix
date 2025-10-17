@@ -1,9 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import Movie from "../components/Movie";
 import { useMovie } from "../hooks/useMovie";
 import { useParams } from "react-router-dom";
 import { useUser } from "../hooks/useUser";
 import {
+
+
   toggleFavorite,
   toggleWatchlist,
   fetchFavorites,
@@ -15,7 +17,6 @@ export default function MoviePage() {
   const { id } = useParams();
   const movieId = Number(id);
   const { user } = useUser();
-  const userId = user?.id ?? "";
 
   const { movie, loading } = useMovie(movieId);
 
@@ -34,7 +35,7 @@ export default function MoviePage() {
     };
   }, [movie, id]);
 
-  // Favorite / Watchlist state
+
   const [isFav, setIsFav] = useState(false);
   const [inList, setInList] = useState(false);
 
@@ -78,7 +79,6 @@ export default function MoviePage() {
         </div>
 
         <div className="grid grid-cols-12 gap-6 items-start">
-          {/* Poster */}
           <div className="col-span-12 md:col-span-4">
             {trailer.poster_url ? (
               <img
@@ -92,7 +92,6 @@ export default function MoviePage() {
             )}
           </div>
 
-          {/* Video + Overview */}
           <div className="col-span-12 md:col-span-8">
             <div className="w-full aspect-video bg-black/40 rounded-lg overflow-hidden shadow-lg">
               <iframe
@@ -104,21 +103,17 @@ export default function MoviePage() {
               />
             </div>
 
-            {/* Overview */}
             <div className="mt-4 bg-[#2A2660] text-white/90 rounded-lg px-4 py-3">
               <p>{(movie as any).overview || (movie as any).description || "A retired operative returns for one last mission."}</p>
             </div>
           </div>
         </div>
 
-        {/* Actions */}
         <div className="mt-6 flex flex-wrap gap-3">
           <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Rate</button>
           <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Comment</button>
           <button
-            className={`font-medium px-4 py-2 rounded-lg ${
-              isFav ? 'bg-purple-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
-            }`}
+            className={`font-medium px-4 py-2 rounded-lg ${isFav ? 'bg-purple-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
             onClick={async () => {
               if (!user) return alert("Please sign in to favorite");
               setIsFav((v) => !v);
@@ -128,9 +123,7 @@ export default function MoviePage() {
             {isFav ? "Favorited" : "Add to favorites"}
           </button>
           <button
-            className={`font-medium px-4 py-2 rounded-lg ${
-              inList ? 'bg-indigo-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'
-            }`}
+            className={`font-medium px-4 py-2 rounded-lg ${inList ? 'bg-indigo-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
             onClick={async () => {
               if (!user) return alert("Please sign in to add to watch list");
               setInList((v) => !v);
@@ -141,9 +134,8 @@ export default function MoviePage() {
           </button>
         </div>
 
-        {/* Keep existing comments UI */}
         <div className="mt-8">
-          <Movie movie={movie} userId={userId} />
+          <Movie movie={movie} userId={user?.id ?? ""} />
         </div>
       </div>
     </main>
