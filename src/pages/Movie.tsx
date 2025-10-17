@@ -107,7 +107,7 @@ export default function MovieDetailPage() {
 
       if (Array.isArray(r.commenter) && r.commenter.length > 0) {
         commenterUsername = r.commenter[0]?.username ?? null;
-      } else if (r.commenter && typeof r.commenter === "object") {
+      } else if (isProfile(r.commenter)) {
         commenterUsername = (r.commenter as { username: string | null }).username ?? null;
       }
 
@@ -120,9 +120,23 @@ export default function MovieDetailPage() {
   }, [videoId, fetchComments]);
 
 
+  // Type guard for joined commenter shape
+  const isProfile = (val: any): val is { username: string | null } => {
+    return !!val && typeof val === "object" && !Array.isArray(val) && ("username" in val);
+  };
+
+  // Ensure a profile row exists for a user
+  async function ensureProfile(userId: string) {
+    if (!userId) return;
+    const { data } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
+    if (!data) {
+      await supabase.from("profiles").insert({ id: userId, username: null });
+    }
+  }
+
   async function addComment(userId: string, trailerIdentifier: string, content: string) {
     try {
-      await ensureProfile();
+      await ensureProfile(userId);
       const { data, error } = await supabase
         .from("comments")
         .insert([{ user_id: userId, trailer_id: trailerIdentifier, content }])
@@ -132,7 +146,7 @@ export default function MovieDetailPage() {
 
       let commenterUsername: string | null = null;
       if (Array.isArray(r.commenter) && r.commenter.length > 0) commenterUsername = r.commenter[0]?.username ?? null;
-      else if (r.commenter && typeof r.commenter === "object") commenterUsername = r.commenter.username ?? null;
+      else if (isProfile(r.commenter)) commenterUsername = r.commenter.username ?? null;
 
       return { ...r, commenterUsername, _unsynced: false, _error: null } as DisplayComment;
     } catch (e) {
@@ -265,6 +279,8 @@ export default function MovieDetailPage() {
                   _unsynced: true,
                   _error: null,
                 };
+
+
                 setComments((prev) => [optimistic, ...prev]);
                 setNewComment("");
                 try {

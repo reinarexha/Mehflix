@@ -1,4 +1,4 @@
-
+﻿
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useUser } from "../hooks/useUser";
@@ -128,23 +128,35 @@ export default function EditInfoPage() {
     if (newPassword) {
       const { error: passwordError } = await supabase.auth.updateUser({ password: newPassword });
       if (passwordError) {
-        setMessage('Failed to update password: ' + passwordError.message);
+        setMessage({ text: 'Failed to update password: ' + passwordError.message, type: 'error' });
         setLoading(false);
         return;
       }
     }
 
-    if (error) {
-      setMessage({ text: error.message, type: "error" });
-    } else {
-      setMessage({ text: "Password updated successfully!", type: "success" });
-    }
+    setMessage({ text: "Password updated successfully!", type: "success" });
 
     setNewPassword("");
 
     setLoading(false);
   };
 
+  // Save all changes (uses individual update helpers)
+  const handleSave = async () => {
+    if (!currentUser) {
+      setMessage({ text: "Please sign in to save changes", type: "error" });
+      return;
+    }
+    if (username !== undefined) {
+      await updateUsername();
+    }
+    if (email && email !== (currentUser.email ?? "")) {
+      await updateEmail();
+    }
+    if (newPassword) {
+      await updatePassword();
+    }
+  };
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white">
       <div className="bg-gray-800 p-6 rounded-2xl w-full max-w-md flex flex-col gap-4">
@@ -165,7 +177,6 @@ export default function EditInfoPage() {
           {loading ? 'Saving...' : 'Save Changes'}
         </button>
 
-        {message && <p className="text-center mt-2">{message}</p>}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Movie from "../components/Movie";
 import { useMovie } from "../hooks/useMovie";
 import { useParams } from "react-router-dom";
