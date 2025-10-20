@@ -21,6 +21,8 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import EditInfoPage from './pages/EditInfoPage';
 import PersonalInfoPage from './pages/PersonalInfoPage';
 import DatabaseTest from './pages/DatabaseTest';
+import TrailerManagement from './pages/TrailerManagement';
+import DebugTrailer from './pages/DebugTrailer';
 
 import './App.css';
 
@@ -89,6 +91,8 @@ function App() {
             <Route path="/edit-info" element={<EditInfoPageWrapper />} />
             <Route path="/personal-info" element={<PersonalInfoPageWrapper />} />
             <Route path="/database-test" element={<DatabaseTest />} />
+            <Route path="/trailer-management" element={<TrailerManagement />} />
+            <Route path="/debug-trailer" element={<DebugTrailer />} />
           </Route>
 
           {/* Catch all */}
