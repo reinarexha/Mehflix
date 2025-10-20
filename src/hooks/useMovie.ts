@@ -16,10 +16,14 @@ export function useMovie(movieId: number) {
         .from("movies")
         .select("*")
         .eq("id", movieId)
-        .single();
+        .maybeSingle();
 
-      if (error) console.error("Error fetching movie:", error.message);
-      else setMovie(data);
+      if (error) {
+        console.error("Error fetching movie:", error.message);
+        setMovie(null);
+      } else {
+        setMovie(data);
+      }
 
       setLoading(false);
     };

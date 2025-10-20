@@ -48,24 +48,66 @@ export default function MovieDetailPage() {
         try {
           const data = await getMovieById(videoId);
           setMovieData(data);
+          if (!data) {
+            console.warn("Movie not found in trailers table for ID:", videoId);
+            // For coming soon movies, we might not have trailer data yet
+            // Let's check if this ID exists in other movie tables
+            try {
+              // Try to parse the videoId as a number for the movies table
+              const numericId = parseInt(videoId);
+              if (isNaN(numericId)) {
+                console.warn("Invalid numeric ID for movies table:", videoId);
+                return;
+              }
+              
+              // Check multiple tables: movies, upcoming_movies, new_releases
+              const [moviesResult, upcomingResult, newReleasesResult] = await Promise.all([
+                supabase.from('movies').select('*').eq('id', numericId).maybeSingle(),
+                supabase.from('upcoming_movies').select('*').eq('id', numericId).maybeSingle(),
+                supabase.from('new_releases').select('*').eq('id', numericId).maybeSingle()
+              ]);
+              
+              // Use the first result we find
+              const movieRow = moviesResult.data || upcomingResult.data || newReleasesResult.data;
+              
+              if (movieRow) {
+                console.log("Found movie data in database:", movieRow);
+                const tableName = moviesResult.data ? 'movies' : upcomingResult.data ? 'upcoming_movies' : 'new_releases';
+                console.log("Found in table:", tableName);
+                
+                // Create a temporary trailer object from movie data
+                const tempTrailer = {
+                  id: videoId,
+                  title: movieRow.title || "Coming Soon Movie",
+                  youtube_id: videoId, // Use the ID as youtube_id for now
+                  category: movieRow.genre || "Coming Soon",
+                  poster_url: movieRow.poster_url || "https://via.placeholder.com/360x540/374151/FFFFFF?text=Coming+Soon"
+                };
+                setMovieData(tempTrailer);
+              } else {
+                console.warn("Movie not found in any table for ID:", videoId);
+              }
+            } catch (movieError) {
+              console.error("Failed to load from movies table:", movieError);
+            }
+          }
         } catch (error) {
           console.error("Failed to load movie:", error);
         }
       }
     }
     loadMovie();
-
   }, [videoId]);
 
   const trailer = useMemo(() => ({
     id: movieData?.id || videoId,
-    title: routeState?.title || movieData?.title || "Untitled Movie",
-    year: routeState?.year || "2023",
+    title: routeState?.title || movieData?.title || "Coming Soon Movie",
+    year: routeState?.year || "2025",
     ranking: routeState?.rank || Math.floor(Math.random() * 100),
     youtube_id: movieData?.youtube_id || videoId,
-    category: movieData?.category || "Drama",
-    poster_url: routeState?.poster || movieData?.poster_url || "https://via.placeholder.com/360x540?text=No+Poster",
-    summary: "No summary available for this movie yet.", // always fallback
+    category: movieData?.category || "Coming Soon",
+    poster_url: routeState?.poster || movieData?.poster_url || "https://via.placeholder.com/360x540/374151/FFFFFF?text=Coming+Soon",
+    summary: "This movie is coming soon. Check back later for more details!", // better fallback for coming soon
   }), [movieData, videoId, routeState]);
 
   const src = `https://www.youtube.com/embed/${trailer.youtube_id}?autoplay=0&rel=0&modestbranding=1`;

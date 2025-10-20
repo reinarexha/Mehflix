@@ -53,21 +53,46 @@ useEffect(() => {
     setLoading(true)
 
     try {
+      console.log('🔄 Starting to fetch movies from Supabase...')
+      
       const [allMovies, comingSoon, newReleases] = await Promise.all([
         supabase.from('movies').select('*').order('release_date', { ascending: false }),
         supabase.from('upcoming_movies').select('*').order('release_date', { ascending: true }),
         supabase.from('new_releases').select('*').order('release_date', { ascending: false }),
       ])
 
-      if (allMovies.error) throw allMovies.error
-      if (comingSoon.error) throw comingSoon.error
-      if (newReleases.error) throw newReleases.error
-
-      console.log('🎬 Loaded:', {
-        movies: allMovies.data?.length,
-        comingSoon: comingSoon.data?.length,
-        newReleases: newReleases.data?.length,
+      console.log('📊 Raw query results:', {
+        allMovies: { data: allMovies.data?.length, error: allMovies.error },
+        comingSoon: { data: comingSoon.data?.length, error: comingSoon.error },
+        newReleases: { data: newReleases.data?.length, error: newReleases.error }
       })
+
+      if (allMovies.error) {
+        console.error('❌ Error fetching movies:', allMovies.error)
+        throw allMovies.error
+      }
+      if (comingSoon.error) {
+        console.error('❌ Error fetching upcoming_movies:', comingSoon.error)
+        throw comingSoon.error
+      }
+      if (newReleases.error) {
+        console.error('❌ Error fetching new_releases:', newReleases.error)
+        throw newReleases.error
+      }
+
+      console.log('🎬 Successfully loaded:', {
+        movies: allMovies.data?.length || 0,
+        comingSoon: comingSoon.data?.length || 0,
+        newReleases: newReleases.data?.length || 0,
+      })
+
+      // Log sample data to see structure
+      if (comingSoon.data && comingSoon.data.length > 0) {
+        console.log('📝 Sample coming soon movie:', comingSoon.data[0])
+      }
+      if (newReleases.data && newReleases.data.length > 0) {
+        console.log('📝 Sample new release movie:', newReleases.data[0])
+      }
 
       setMovies(allMovies.data || [])
       setComingSoonDb(comingSoon.data || [])
@@ -184,6 +209,15 @@ useEffect(() => {
       return diff <= 14 && !popular.some(p => p.id === m.id)
     })
     .slice(0, 10)
+
+  console.log('📋 Processed movie lists:', {
+    totalMovies: movies.length,
+    popular: popular.length,
+    comingSoonDb: comingSoonDb.length,
+    comingSoonLocal: comingSoonLocal.length,
+    newReleasesDb: newReleasesDb.length,
+    newReleasesLocal: newReleasesLocal.length
+  })
 
   async function handleFavorite(id: number) {
     if (userLoading) return showToast('Checking sign-in statusâ€¦')
@@ -439,6 +473,8 @@ function Section({
   onFavorite?: (id: number) => void
   onWatchlist?: (id: number) => void
 }) {
+  console.log(`🎬 Section "${title}" received ${movies.length} movies:`, movies.map(m => ({ id: m.id, title: m.title })))
+  
   return (
     <section style={{ marginBottom: '2.5rem' }}>
       <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 600, color: 'white' }}>{title}</h2>
