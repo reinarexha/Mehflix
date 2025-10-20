@@ -7,6 +7,7 @@ import {
   toggleWatchlist,
   fetchFavorites,
   fetchWatchlist,
+  ensureTrailerExists,
   type CommentRow,
 } from "../lib/data";
 import { getMovieById, type Trailer } from "../lib/trailers";
@@ -179,6 +180,50 @@ export default function MovieDetailPage() {
   async function addComment(userId: string, trailerIdentifier: string, content: string) {
     try {
       await ensureProfile(userId);
+      
+      // Ensure the trailer exists in the trailers table before commenting
+      const trailerData = {
+        id: trailerIdentifier,
+        title: trailer.title,
+        youtube_id: trailer.youtube_id,
+        category: trailer.category,
+        poster_url: trailer.poster_url
+      };
+      
+      console.log('🎬 Ensuring trailer exists for comments:', trailerData);
+      
+      try {
+        const trailerEnsured = await ensureTrailerExists(trailerData);
+        console.log('✅ Trailer ensured result:', trailerEnsured);
+        
+        if (!trailerEnsured) {
+          throw new Error('Failed to create trailer record for comments');
+        }
+      } catch (trailerError) {
+        console.error('❌ Error ensuring trailer exists:', trailerError);
+        const errorMessage = trailerError instanceof Error ? trailerError.message : 'Unknown error';
+        throw new Error('Failed to prepare trailer for comments: ' + errorMessage);
+      }
+      
+      // Double-check that the trailer now exists
+      const { data: existingTrailer, error: checkError } = await supabase
+        .from('trailers')
+        .select('id')
+        .eq('id', trailerIdentifier)
+        .maybeSingle();
+        
+      if (checkError) {
+        console.error('❌ Error checking trailer existence:', checkError);
+        throw new Error('Failed to verify trailer exists');
+      }
+      
+      if (!existingTrailer) {
+        console.error('❌ Trailer still does not exist after ensureTrailerExists');
+        throw new Error('Trailer record was not created successfully');
+      }
+      
+      console.log('✅ Trailer confirmed to exist, proceeding with comment insertion');
+      
       const { data, error } = await supabase
         .from("comments")
         .insert([{ user_id: userId, trailer_id: trailerIdentifier, content }])

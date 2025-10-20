@@ -12,7 +12,7 @@ export type CommentRow = {
 };
 
 /* ========= Ensure trailer exists (DB) ========= */
-async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
+export async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
   if (!trailer?.id) return false;
   
   try {

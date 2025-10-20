@@ -20,6 +20,7 @@ import RatingsPage from './pages/RatingsPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import EditInfoPage from './pages/EditInfoPage';
 import PersonalInfoPage from './pages/PersonalInfoPage';
+import DatabaseTest from './pages/DatabaseTest';
 
 import './App.css';
 
@@ -87,6 +88,7 @@ function App() {
             <Route path="/change-password" element={<ChangePasswordPageWrapper />} />
             <Route path="/edit-info" element={<EditInfoPageWrapper />} />
             <Route path="/personal-info" element={<PersonalInfoPageWrapper />} />
+            <Route path="/database-test" element={<DatabaseTest />} />
           </Route>
 
           {/* Catch all */}

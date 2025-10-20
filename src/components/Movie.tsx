@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { ensureTrailerExists } from "../lib/data";
 import { Heart, Send } from "lucide-react";
 
 type Comment = {
@@ -25,13 +26,24 @@ export default function Movie({ movie, userId }: Props) {
   // Safe trailer identifier
   const trailerIdentifier = movie?.id?.toString() || "";
 
-  // Fetch comments for this movie (no join; fetch usernames separately)
+  // Fetch comments for this movie with usernames joined
   const fetchComments = async () => {
     if (!trailerIdentifier) return;
 
+    console.log('📝 Fetching comments for trailer:', trailerIdentifier);
+
+    // Fetch comments with joined profile data for usernames
     const { data, error } = await supabase
       .from("comments")
-      .select("id, user_id, trailer_id, content, created_at, likes")
+      .select(`
+        id, 
+        user_id, 
+        trailer_id, 
+        content, 
+        created_at, 
+        likes,
+        commenter:profiles(username, email)
+      `)
       .eq("trailer_id", trailerIdentifier)
       .order("created_at", { ascending: false });
 
@@ -40,46 +52,90 @@ export default function Movie({ movie, userId }: Props) {
       return;
     }
 
-    const rows = (data || []) as Comment[];
-    setComments(rows);
+    console.log('📝 Raw comments data:', data);
 
-    // Load usernames for distinct user_ids (if profiles table exists)
-    const ids = Array.from(new Set(rows.map((r) => r.user_id)));
-    if (ids.length) {
-      try {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, username")
-          .in("id", ids);
-        const map = new Map((profiles ?? []).map((p: any) => [p.id, p.username as string | null]));
-        setComments((prev) => prev.map((c) => ({ ...c, commenterUsername: map.get(c.user_id) ?? null })));
-      } catch {
-        // If profiles table is missing, silently fall back to user_id
+    // Transform the data to include usernames
+    const commentsWithUsernames = (data || []).map((comment: any) => {
+      let username = null;
+      
+      // Handle the joined profile data
+      if (comment.commenter) {
+        if (Array.isArray(comment.commenter) && comment.commenter.length > 0) {
+          username = comment.commenter[0]?.username || comment.commenter[0]?.email;
+        } else if (comment.commenter.username || comment.commenter.email) {
+          username = comment.commenter.username || comment.commenter.email;
+        }
       }
-    }
+      
+      // Fallback to user ID if no username found
+      if (!username) {
+        username = comment.user_id;
+      }
+
+      return {
+        ...comment,
+        commenterUsername: username
+      };
+    });
+
+    console.log('✅ Final comments with usernames:', commentsWithUsernames);
+    setComments(commentsWithUsernames);
   };
 
   // Add a new comment
   const addComment = async () => {
     if (!newComment.trim()) return;
 
-    const { data, error } = await supabase
-      .from("comments")
-      .insert([{ user_id: userId, trailer_id: trailerIdentifier, content: newComment }])
-      .select("id, user_id, trailer_id, content, created_at, likes");
+    try {
+      // Ensure the trailer exists in the trailers table before commenting
+      const trailerData = {
+        id: trailerIdentifier,
+        title: movie?.title || "Movie",
+        youtube_id: trailerIdentifier, // Use movie ID as youtube_id for now
+        category: movie?.genre || movie?.category || "Movie",
+        poster_url: movie?.poster_url || ""
+      };
+      
+      console.log('🎬 (Component) Ensuring trailer exists for comments:', trailerData);
+      
+      const trailerEnsured = await ensureTrailerExists(trailerData);
+      console.log('✅ (Component) Trailer ensured result:', trailerEnsured);
+      
+      if (!trailerEnsured) {
+        console.error('❌ (Component) Failed to create trailer record');
+        return;
+      }
 
-    if (error) {
-      console.error("Error adding comment:", error.message);
-      return;
-    }
+      const { data, error } = await supabase
+        .from("comments")
+        .insert([{ user_id: userId, trailer_id: trailerIdentifier, content: newComment }])
+        .select("id, user_id, trailer_id, content, created_at, likes");
 
-    if (data && data.length > 0) {
-      const newRow = data[0] as Comment;
-      setComments((prev) => [
-        { ...newRow, commenterUsername: prev.find((p) => p.user_id === newRow.user_id)?.commenterUsername ?? null },
-        ...prev,
-      ]);
-      setNewComment("");
+      if (error) {
+        console.error("Error adding comment:", error.message);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const newRow = data[0] as Comment;
+        
+        // Get the current user's username for the new comment
+        const { data: currentUserProfile } = await supabase
+          .from("profiles")
+          .select("username, email")
+          .eq("id", userId)
+          .maybeSingle();
+        
+        const username = currentUserProfile?.username || currentUserProfile?.email || userId;
+        
+        setComments((prev) => [
+          { ...newRow, commenterUsername: username },
+          ...prev,
+        ]);
+        setNewComment("");
+      }
+    } catch (error) {
+      console.error("Failed to add comment:", error);
     }
   };
 

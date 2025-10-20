@@ -9,20 +9,37 @@ type MessageType = {
 };
 
 export default function EditInfoPage() {
-  const { user: currentUser } = useUser();
+  const { user: currentUser, loading: userLoading } = useUser();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<MessageType>({ text: "", type: "success" });
 
+  // Debug: Log user state
+  useEffect(() => {
+    console.log('EditInfoPage - User state:', { currentUser, userLoading });
+    console.log('EditInfoPage - Current user object:', currentUser);
+    console.log('EditInfoPage - User loading state:', userLoading);
+    console.log('EditInfoPage - Type of currentUser:', typeof currentUser);
+    console.log('EditInfoPage - Is currentUser truthy?', !!currentUser);
+  }, [currentUser, userLoading]);
+
   // Load initial profile data
   useEffect(() => {
     async function loadProfile() {
+      // Don't set error message if still loading
+      if (userLoading) {
+        return;
+      }
+      
       if (!currentUser) {
         setMessage({ text: "Please sign in to edit your profile", type: "error" });
         return;
       }
+
+      // Clear any previous error messages when user is authenticated
+      setMessage({ text: "", type: "success" });
 
       setLoading(true);
       try {
@@ -49,7 +66,7 @@ export default function EditInfoPage() {
     }
 
     loadProfile();
-  }, [currentUser]);
+  }, [currentUser, userLoading]);
 
 
   // Handle username updates
@@ -162,20 +179,74 @@ export default function EditInfoPage() {
       <div className="bg-gray-800 p-6 rounded-2xl w-full max-w-md flex flex-col gap-4">
         <h1 className="text-2xl font-bold text-center mb-4">Edit Profile</h1>
 
-      {message.text && (
-        <p className={`mb-4 ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>
-          {message.text}
-        </p>
-      )}
+        {message.text && (
+          <p className={`mb-4 ${message.type === "error" ? "text-red-400" : "text-green-400"}`}>
+            {message.text}
+          </p>
+        )}
 
+        {userLoading ? (
+          <div className="text-center">
+            <p className="text-gray-400">Loading user data...</p>
+          </div>
+        ) : currentUser ? (
+          <>
+            <div className="text-sm text-gray-400 mb-4">
+              Signed in as: {currentUser.email}
+            </div>
 
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md mt-2"
-        >
-          {loading ? 'Saving...' : 'Save Changes'}
-        </button>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+                className="bg-gray-700 border border-gray-600 px-3 py-2 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="bg-gray-700 border border-gray-600 px-3 py-2 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-gray-300">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (optional)"
+                className="bg-gray-700 border border-gray-600 px-3 py-2 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed px-4 py-2 rounded-md mt-2 transition-colors"
+            >
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
+          </>
+        ) : (
+          <div className="text-center">
+            <p className="text-red-400 mb-4">Please sign in to edit your profile</p>
+            <a 
+              href="/login" 
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md inline-block text-white no-underline"
+            >
+              Go to Login
+            </a>
+          </div>
+        )}
 
       </div>
     </div>
