@@ -55,20 +55,36 @@ useEffect(() => {
     try {
       console.log('🔄 Starting to fetch movies from Supabase...')
       
-      const [allMovies, comingSoon, newReleases] = await Promise.all([
-        supabase.from('movies').select(`
-          *, 
-          trailers!inner(youtube_id)
-        `).order('release_date', { ascending: false }).limit(100),
-        supabase.from('upcoming_movies').select(`
-          *, 
-          trailers(youtube_id)
-        `).order('release_date', { ascending: true }).limit(50),
-        supabase.from('new_releases').select(`
-          *, 
-          trailers(youtube_id)
-        `).order('release_date', { ascending: false }).limit(50),
-      ])
+      // Try with trailers first, fallback to simple query if it fails
+      let allMovies: any, comingSoon: any, newReleases: any;
+      
+      try {
+        [allMovies, comingSoon, newReleases] = await Promise.all([
+          supabase.from('movies').select(`
+            *, 
+            trailers(youtube_id)
+          `).order('release_date', { ascending: false }).limit(100),
+          supabase.from('upcoming_movies').select(`
+            *, 
+            trailers(youtube_id)
+          `).order('release_date', { ascending: true }).limit(50),
+          supabase.from('new_releases').select(`
+            *, 
+            trailers(youtube_id)
+          `).order('release_date', { ascending: false }).limit(50),
+        ])
+      } catch (error) {
+        console.warn('⚠️ Trailer join failed, trying simple query:', error)
+        // Fallback to simple queries without trailer joins
+        const fallbackResults = await Promise.all([
+          supabase.from('movies').select('*').order('release_date', { ascending: false }).limit(100),
+          supabase.from('upcoming_movies').select('*').order('release_date', { ascending: true }).limit(50),
+          supabase.from('new_releases').select('*').order('release_date', { ascending: false }).limit(50),
+        ])
+        allMovies = fallbackResults[0]
+        comingSoon = fallbackResults[1]
+        newReleases = fallbackResults[2]
+      }
 
       console.log('📊 Raw query results:', {
         allMovies: { data: allMovies.data?.length, error: allMovies.error },
