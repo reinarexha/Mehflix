@@ -54,8 +54,8 @@ export default function Movie({ movie, userId }: Props) {
 
     console.log('📝 Raw comments data:', data);
 
-    // Transform the data to include usernames
-    const commentsWithUsernames = (data || []).map((comment: any) => {
+    // Transform the data to include usernames and like counts
+    const commentsWithUsernames = await Promise.all((data || []).map(async (comment: any) => {
       let username = null;
       
       // Handle the joined profile data
@@ -72,14 +72,39 @@ export default function Movie({ movie, userId }: Props) {
         username = comment.user_id;
       }
 
+      // Get actual like count from comment_likes table
+      const { data: likesData, error: likesError } = await supabase
+        .from("comment_likes")
+        .select("id")
+        .eq("comment_id", comment.id);
+
+      const actualLikeCount = likesError ? 0 : (likesData?.length || 0);
+
       return {
         ...comment,
-        commenterUsername: username
+        commenterUsername: username,
+        likes: actualLikeCount
       };
-    });
+    }));
 
     console.log('✅ Final comments with usernames:', commentsWithUsernames);
     setComments(commentsWithUsernames);
+
+    // Load current user's likes for these comments
+    if (userId && commentsWithUsernames.length > 0) {
+      const commentIds = commentsWithUsernames.map(c => c.id);
+      const { data: userLikes } = await supabase
+        .from("comment_likes")
+        .select("comment_id")
+        .eq("user_id", userId)
+        .in("comment_id", commentIds);
+
+      const likeMap: { [key: string]: boolean } = {};
+      (userLikes || []).forEach((like: any) => {
+        likeMap[like.comment_id] = true;
+      });
+      setLikes(likeMap);
+    }
   };
 
   // Add a new comment
@@ -139,35 +164,67 @@ export default function Movie({ movie, userId }: Props) {
     }
   };
 
-  // Like/unlike a comment
+  // Like/unlike a comment with notifications
   const toggleLike = async (commentId: string) => {
-    const isLiked = likes[commentId];
-    setLikes({ ...likes, [commentId]: !isLiked });
-
-    const { data, error } = await supabase
-      .from("comments")
-      .select("likes")
-      .eq("id", commentId)
-      .single();
-
-    if (error) {
-      console.error("Error fetching current likes:", error.message);
+    if (!userId) {
+      alert("Please sign in to like comments");
       return;
     }
 
-    const newLikesCount = isLiked ? data.likes - 1 : data.likes + 1;
+    try {
+      // Check if user has already liked this comment
+      const { data: existingLike } = await supabase
+        .from("comment_likes")
+        .select("id")
+        .eq("comment_id", commentId)
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    const { error: updateError } = await supabase
-      .from("comments")
-      .update({ likes: newLikesCount })
-      .eq("id", commentId);
+      if (existingLike) {
+        // Unlike: Remove the like
+        const { error: deleteError } = await supabase
+          .from("comment_likes")
+          .delete()
+          .eq("comment_id", commentId)
+          .eq("user_id", userId);
 
-    if (updateError) {
-      console.error("Error updating likes:", updateError.message);
-    } else {
-      setComments((prev) =>
-        prev.map((comment) => (comment.id === commentId ? { ...comment, likes: newLikesCount } : comment))
-      );
+        if (deleteError) {
+          console.error("Error removing like:", deleteError.message);
+          return;
+        }
+
+        // Update UI
+        setLikes({ ...likes, [commentId]: false });
+        setComments((prev) =>
+          prev.map((comment) => 
+            comment.id === commentId 
+              ? { ...comment, likes: Math.max(0, (comment.likes || 0) - 1) }
+              : comment
+          )
+        );
+      } else {
+        // Like: Add the like (this will trigger notification via database trigger)
+        const { error: insertError } = await supabase
+          .from("comment_likes")
+          .insert([{ comment_id: commentId, user_id: userId }]);
+
+        if (insertError) {
+          console.error("Error adding like:", insertError.message);
+          return;
+        }
+
+        // Update UI
+        setLikes({ ...likes, [commentId]: true });
+        setComments((prev) =>
+          prev.map((comment) => 
+            comment.id === commentId 
+              ? { ...comment, likes: (comment.likes || 0) + 1 }
+              : comment
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
     }
   };
 

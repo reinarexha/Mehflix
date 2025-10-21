@@ -56,9 +56,18 @@ useEffect(() => {
       console.log('🔄 Starting to fetch movies from Supabase...')
       
       const [allMovies, comingSoon, newReleases] = await Promise.all([
-        supabase.from('movies').select('*').order('release_date', { ascending: false }),
-        supabase.from('upcoming_movies').select('*').order('release_date', { ascending: true }),
-        supabase.from('new_releases').select('*').order('release_date', { ascending: false }),
+        supabase.from('movies').select(`
+          *, 
+          trailers!inner(youtube_id)
+        `).order('release_date', { ascending: false }).limit(100),
+        supabase.from('upcoming_movies').select(`
+          *, 
+          trailers(youtube_id)
+        `).order('release_date', { ascending: true }).limit(50),
+        supabase.from('new_releases').select(`
+          *, 
+          trailers(youtube_id)
+        `).order('release_date', { ascending: false }).limit(50),
       ])
 
       console.log('📊 Raw query results:', {

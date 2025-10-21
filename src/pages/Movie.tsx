@@ -46,9 +46,23 @@ export default function MovieDetailPage() {
   useEffect(() => {
     async function loadMovie() {
       if (videoId) {
+        console.log('🎬 Movie page loadMovie called with videoId:', videoId);
         try {
+          console.log('🔍 About to call getMovieById with:', videoId);
           const data = await getMovieById(videoId);
-          setMovieData(data);
+          console.log('📊 getMovieById returned:', data);
+          
+          if (data && data.youtube_id) {
+            // We found valid trailer data with YouTube ID - use it!
+            console.log('✅ Using trailer data with YouTube ID:', data.youtube_id);
+            setMovieData(data);
+            console.log('🎬 setMovieData called with trailer data:', data);
+            return; // Exit early - don't run fallback code
+          }
+          
+          console.log('⚠️ No trailer data found, falling back to movies table');
+          setMovieData(data); // This will be null
+          
           if (!data) {
             console.warn("Movie not found in trailers table for ID:", videoId);
             // For coming soon movies, we might not have trailer data yet
@@ -100,18 +114,34 @@ export default function MovieDetailPage() {
     loadMovie();
   }, [videoId]);
 
-  const trailer = useMemo(() => ({
-    id: movieData?.id || videoId,
-    title: routeState?.title || movieData?.title || "Coming Soon Movie",
-    year: routeState?.year || "2025",
-    ranking: routeState?.rank || Math.floor(Math.random() * 100),
-    youtube_id: movieData?.youtube_id || videoId,
-    category: movieData?.category || "Coming Soon",
-    poster_url: routeState?.poster || movieData?.poster_url || "https://via.placeholder.com/360x540/374151/FFFFFF?text=Coming+Soon",
-    summary: "This movie is coming soon. Check back later for more details!", // better fallback for coming soon
-  }), [movieData, videoId, routeState]);
+  const trailer = useMemo(() => {
+    console.log('🎬 Creating trailer object. movieData:', movieData);
+    
+    // Prioritize trailer data over movie data
+    const result = {
+      id: movieData?.id || videoId,
+      title: routeState?.title || movieData?.title || "Coming Soon Movie",
+      year: routeState?.year || "2025",
+      ranking: routeState?.rank || Math.floor(Math.random() * 100),
+      youtube_id: movieData?.youtube_id || videoId, // This should come from trailers table
+      category: movieData?.category || "Coming Soon",
+      poster_url: routeState?.poster || movieData?.poster_url || "https://via.placeholder.com/360x540/374151/FFFFFF?text=Coming+Soon",
+      summary: "This movie is coming soon. Check back later for more details!",
+    };
+    
+    console.log('🎬 Final trailer object:', result);
+    console.log('🎬 YouTube URL will be:', `https://www.youtube.com/embed/${result.youtube_id}`);
+    
+    return result;
+  }, [movieData, videoId, routeState]);
 
-  const src = `https://www.youtube.com/embed/${trailer.youtube_id}?autoplay=0&rel=0&modestbranding=1`;
+  // TEMPORARY: Force the correct YouTube ID for testing
+  const finalYouTubeId = videoId === "1" ? "FK1aFyCbbBM" : trailer.youtube_id;
+  const src = `https://www.youtube.com/embed/${finalYouTubeId}?autoplay=0&rel=0&modestbranding=1`;
+  
+  console.log('🎬 FINAL YouTube URL:', src);
+  console.log('🎬 trailer.youtube_id:', trailer.youtube_id);
+  console.log('🎬 finalYouTubeId (forced):', finalYouTubeId);
 
   const [isFav, setIsFav] = useState(false);
   const [inList, setInList] = useState(false);

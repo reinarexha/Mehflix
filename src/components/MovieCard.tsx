@@ -24,6 +24,14 @@ const MovieCard: React.FC<MovieCardProps> = ({
 
   // Use the poster_url from the trailer object, or create a fallback
   const posterUrl = t.poster_url || `https://via.placeholder.com/300x450/1f2937/9ca3af?text=${encodeURIComponent(t.title || 'Movie')}`
+  const trailerUrl = (() => {
+    const raw = (t.youtube_id || '').trim()
+    if (!raw) return undefined
+    // If it's already a full YouTube URL, use it as-is
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
+    // Otherwise assume it's a video id
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(raw)}`
+  })()
   
   const releaseDate = (t as any).releaseDate 
     ? new Date((t as any).releaseDate).toLocaleDateString() 
@@ -31,24 +39,54 @@ const MovieCard: React.FC<MovieCardProps> = ({
 
   return (
     <div className="bg-gray-800 rounded shadow hover:shadow-lg transition p-2 flex flex-col">
-      <img
-        src={posterUrl}
-        alt={t.title}
-        className="w-full h-48 object-cover rounded mb-2 bg-gray-700"
-        onError={(e) => {
-          // Fallback if image fails to load
-          (e.target as HTMLImageElement).src = `data:image/svg+xml;base64,${btoa(`
-            <svg width="300" height="450" xmlns="http://www.w3.org/2000/svg">
-              <rect width="100%" height="100%" fill="#1f2937"/>
-              <text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14">
-                ${t.title || 'No Poster'}
-              </text>
-            </svg>
-          `)}`;
-        }}
-      />
-      <h3 className="text-white font-semibold text-sm md:text-base truncate">{t.title}</h3>
-      {showDate && <p className="text-gray-400 text-xs">{releaseDate}</p>}
+      {trailerUrl ? (
+        <a
+          href={trailerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+        >
+          <img
+            src={posterUrl}
+            alt={t.title}
+            className="w-full h-48 object-cover rounded mb-2 bg-gray-700"
+            onError={(e) => {
+              // Fallback if image fails to load
+              (e.target as HTMLImageElement).src = `data:image/svg+xml;base64,${btoa(`
+                <svg width="300" height="450" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100%" height="100%" fill="#1f2937"/>
+                  <text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14">
+                    ${t.title || 'No Poster'}
+                  </text>
+                </svg>
+              `)}`;
+            }}
+          />
+          <h3 className="text-white font-semibold text-sm md:text-base truncate">{t.title}</h3>
+          {showDate && <p className="text-gray-400 text-xs">{releaseDate}</p>}
+        </a>
+      ) : (
+        <>
+          <img
+            src={posterUrl}
+            alt={t.title}
+            className="w-full h-48 object-cover rounded mb-2 bg-gray-700"
+            onError={(e) => {
+              // Fallback if image fails to load
+              (e.target as HTMLImageElement).src = `data:image/svg+xml;base64,${btoa(`
+                <svg width="300" height="450" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100%" height="100%" fill="#1f2937"/>
+                  <text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14">
+                    ${t.title || 'No Poster'}
+                  </text>
+                </svg>
+              `)}`;
+            }}
+          />
+          <h3 className="text-white font-semibold text-sm md:text-base truncate">{t.title}</h3>
+          {showDate && <p className="text-gray-400 text-xs">{releaseDate}</p>}
+        </>
+      )}
 
       <div className="mt-2 flex gap-2 justify-center">
         {onRemoveFavorite && (
