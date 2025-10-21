@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
 import Movie from "../components/Movie";
 import { useMovie } from "../hooks/useMovie";
 import { useParams } from "react-router-dom";
@@ -13,6 +13,36 @@ import {
 } from "../lib/data";
 import type { Trailer } from "../lib/trailers";
 
+// Extract a YouTube video id from a raw id or any YouTube URL
+function extractYoutubeId(value: unknown): string | null {
+  if (!value) return null;
+  const input = String(value).trim();
+  // If it looks like a plain id (11 chars typical), just return it
+  if (/^[A-Za-z0-9_-]{6,}$/.test(input) && !input.includes("http")) {
+    return input;
+  }
+  try {
+    const url = new URL(input);
+    // youtu.be/<id>
+    if (url.hostname.endsWith("youtu.be")) {
+      const id = url.pathname.replace(/^\//, "");
+      return id || null;
+    }
+    // youtube.com/watch?v=<id>
+    if (url.hostname.includes("youtube.com")) {
+      const v = url.searchParams.get("v");
+      if (v) return v;
+      // youtube.com/embed/<id> or other path forms
+      const parts = url.pathname.split("/").filter(Boolean);
+      const idx = parts.indexOf("embed");
+      if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+    }
+  } catch {
+    // not a URL, ignore
+  }
+  return null;
+}
+
 export default function MoviePage() {
   const { id } = useParams();
   const movieId = Number(id);
@@ -24,7 +54,9 @@ export default function MoviePage() {
   const trailer: Trailer | null = useMemo(() => {
     if (!movie) return null;
     const baseId = String((movie as any).id ?? id ?? "");
-    const youtube_id = baseId;
+    const rawTrailer = (movie as any).trailer_id ?? (movie as any).youtube_id ?? baseId;
+    const parsedId = extractYoutubeId(rawTrailer) || String(rawTrailer || baseId);
+    const youtube_id = parsedId;
     const category: string = String((movie as any).genre ?? (movie as any).category ?? "Unknown");
     return {
       id: baseId,

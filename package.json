@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "backfill:trailers": "node scripts/backfill-trailers.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.0",
