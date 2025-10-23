@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TMDbTrailerService } from '../services/tmdbTrailerService';
 
 export default function DebugTrailer() {
@@ -29,7 +29,8 @@ export default function DebugTrailer() {
       }
 
     } catch (error) {
-      setResult(prev => prev + `\nError: ${error.message}`);
+  // error is unknown; stringify safely
+  setResult(prev => prev + `\nError: ${String((error as any)?.message ?? error)}`);
       console.error('Test error:', error);
     }
   };
@@ -40,7 +41,7 @@ export default function DebugTrailer() {
       const success = await TMDbTrailerService.updateMovieTrailer(1);
       setResult(`Update result: ${success ? 'Success!' : 'Failed'}`);
     } catch (error) {
-      setResult(`Update error: ${error.message}`);
+  setResult(`Update error: ${String((error as any)?.message ?? error)}`);
       console.error('Update error:', error);
     }
   };

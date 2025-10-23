@@ -73,6 +73,25 @@ useEffect(() => {
             trailers(youtube_id)
           `).order('release_date', { ascending: false }).limit(50),
         ])
+
+        // PostgREST/Supabase sometimes returns an object with an .error
+        // property instead of throwing — detect that and fallback.
+        if (allMovies?.error || comingSoon?.error || newReleases?.error) {
+          console.warn('⚠️ Embedded trailer select returned errors, falling back to simple selects', {
+            allMoviesError: allMovies?.error,
+            comingSoonError: comingSoon?.error,
+            newReleasesError: newReleases?.error
+          })
+
+          const fallbackResults = await Promise.all([
+            supabase.from('movies').select('*').order('release_date', { ascending: false }).limit(100),
+            supabase.from('upcoming_movies').select('*').order('release_date', { ascending: true }).limit(50),
+            supabase.from('new_releases').select('*').order('release_date', { ascending: false }).limit(50),
+          ])
+          allMovies = fallbackResults[0]
+          comingSoon = fallbackResults[1]
+          newReleases = fallbackResults[2]
+        }
       } catch (error) {
         console.warn('⚠️ Trailer join failed, trying simple query:', error)
         // Fallback to simple queries without trailer joins
@@ -363,10 +382,14 @@ useEffect(() => {
   }
 
   if (loading) return <p className="text-white text-center">Loading movies from Supabase...</p>
-  if (!movies.length) return <p className="text-white text-center">No movies found.</p>
+
+  // If none of the movie lists have data, show the global empty state.
+  const hasAnyMovies = (movies && movies.length) || (comingSoonDb && comingSoonDb.length) || (newReleasesDb && newReleasesDb.length)
+  if (!hasAnyMovies) return <p className="text-white text-center">No movies found.</p>
 
   return (
     <main style={{ maxWidth: 1280, margin: '0 auto', padding: '1rem' }}>
+      
       {/* Search */}
       <section style={{ position: 'relative', marginBottom: '1rem' }}>
         <input
