@@ -22,36 +22,48 @@ export async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
       title: trailer.title && !trailer.title.includes('Unknown') 
         ? trailer.title 
         : 'Unknown Movie',
-      youtube_id: trailer.youtube_id || trailer.id,
+      // Keep the raw youtube value (could be full url or key)
+      youtube_raw: trailer.youtube_id || trailer.id,
       category: trailer.category || 'Unknown',
-      // Fix poster URLs - replace local paths with valid URLs
-      poster_url: isValidPosterUrl(trailer.poster_url) 
-        ? trailer.poster_url 
-        : getDefaultPosterUrl()
+      // Poster URL is not a column in the current trailers table; keep for UI only
+      poster_url: isValidPosterUrl(trailer.poster_url) ? trailer.poster_url : getDefaultPosterUrl()
     };
 
     // First check if trailer already exists
+    // Use numeric id when possible (trailers.id is bigint in the DB)
+    const numericId = Number.isFinite(Number(validatedTrailer.id)) ? Number(validatedTrailer.id) : validatedTrailer.id;
     const { data: existingTrailer } = await supabase
       .from('trailers')
-      .select('id, title, poster_url')
-      .eq('id', validatedTrailer.id)
+      .select('id, name, youtube_url, youtube_key, type, source_table')
+      .eq('id', numericId)
       .maybeSingle();
 
     // If trailer exists, update it with validated data
     if (existingTrailer) {
-      // console.log('🔄 Updating existing trailer:', validatedTrailer.id, validatedTrailer.title);
+      // Update using the existing table columns (name, youtube_key or youtube_url, type)
+  const updatePayload: any = { name: validatedTrailer.title, type: validatedTrailer.category };
+      // Determine whether we have an 11-char youtube key or a URL
+      const raw = String(validatedTrailer.youtube_raw || '').trim();
+      if (/^[A-Za-z0-9_-]{11}$/.test(raw)) {
+        updatePayload.youtube_key = raw;
+      } else if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        updatePayload.youtube_url = raw;
+      } else if (raw) {
+        // fallback to youtube_key
+        updatePayload.youtube_key = raw;
+      }
+
+      // Ensure source_table/source_row_id are present to satisfy NOT NULL constraints
+  if (!(existingTrailer as any).source_table) updatePayload.source_table = 'movies';
+  if (!(existingTrailer as any).source_row_id) updatePayload.source_row_id = Number.isFinite(Number(validatedTrailer.id)) ? Number(validatedTrailer.id) : null;
+
       const { error } = await supabase
         .from('trailers')
-        .update({
-          title: validatedTrailer.title,
-          youtube_id: validatedTrailer.youtube_id,
-          category: validatedTrailer.category,
-          poster_url: validatedTrailer.poster_url
-        })
-        .eq('id', validatedTrailer.id);
+        .update(updatePayload)
+        .eq('id', numericId);
       
       if (error) {
-        // console.error('❌ Error updating trailer:', error);
+        console.error('❌ Error updating trailer (supabase):', error);
         return false;
       }
       // console.log('✅ Updated trailer:', validatedTrailer.id, validatedTrailer.title);
@@ -60,13 +72,28 @@ export async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
 
     // If trailer doesn't exist, create it
     // console.log('🚀 Creating new trailer:', validatedTrailer);
-    
+    // Build insert payload using existing DB column names
+  const insertPayload: any = { id: numericId, name: validatedTrailer.title, type: validatedTrailer.category };
+    const rawInsert = String(validatedTrailer.youtube_raw || '').trim();
+    if (/^[A-Za-z0-9_-]{11}$/.test(rawInsert)) {
+      insertPayload.youtube_key = rawInsert;
+    } else if (rawInsert.startsWith('http://') || rawInsert.startsWith('https://')) {
+      insertPayload.youtube_url = rawInsert;
+    } else if (rawInsert) {
+      insertPayload.youtube_key = rawInsert;
+    }
+
+    // Set required source_table/source_row_id to link this trailer back to the movies table.
+    // The `source_table` column is NOT NULL in your DB schema, so provide a sensible default.
+    insertPayload.source_table = 'movies';
+    insertPayload.source_row_id = Number.isFinite(Number(validatedTrailer.id)) ? Number(validatedTrailer.id) : null;
+
     const { error } = await supabase
       .from('trailers')
-      .insert([validatedTrailer]);
-      
+      .insert([insertPayload]);
+
     if (error) {
-      // console.error('❌ Error creating trailer:', error);
+      console.error('❌ Error inserting trailer (supabase):', { error, payload: insertPayload });
       return false;
     }
     
@@ -359,6 +386,42 @@ export async function addComment(userId: string, trailerId: string, content: str
   } catch (error) {
     // console.error('Error adding comment:', error);
     throw error;
+  }
+}
+
+/* ========= Update / Delete Comments (for owners) ========= */
+export async function updateComment(commentId: string, userId: string, newContent: string): Promise<{ success: boolean; error?: any }> {
+  if (!commentId || !userId || !newContent) return { success: false, error: 'Invalid params' };
+
+  try {
+    const { error } = await supabase
+      .from('comments')
+      .update({ content: newContent.trim() })
+      .eq('id', commentId)
+      .eq('user_id', userId)
+      .select('id');
+
+    if (error) return { success: false, error };
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err };
+  }
+}
+
+export async function deleteComment(commentId: string, userId: string): Promise<{ success: boolean; error?: any }> {
+  if (!commentId || !userId) return { success: false, error: 'Invalid params' };
+
+  try {
+    const { error } = await supabase
+      .from('comments')
+      .delete()
+      .eq('id', commentId)
+      .eq('user_id', userId);
+
+    if (error) return { success: false, error };
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err };
   }
 }
 

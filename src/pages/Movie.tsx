@@ -8,6 +8,8 @@ import {
   fetchFavorites,
   fetchWatchlist,
   ensureTrailerExists,
+  updateComment as updateCommentRow,
+  deleteComment as deleteCommentRow,
   type CommentRow,
 } from "../lib/data";
 import { getMovieById, type Trailer } from "../lib/trailers";
@@ -147,6 +149,8 @@ export default function MovieDetailPage() {
   const [inList, setInList] = useState(false);
   const [comments, setComments] = useState<DisplayComment[]>([]);
   const [newComment, setNewComment] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>("");
 
 
   useEffect(() => {
@@ -277,6 +281,37 @@ export default function MovieDetailPage() {
     const { data: existing } = await supabase.from("comments").select("likes").eq("id", commentId).maybeSingle();
     const current = (existing?.likes ?? 0) as number;
     await supabase.from("comments").update({ likes: current + 1 }).eq("id", commentId);
+  }
+
+  // Edit / Delete handlers for comment owners
+  async function handleSaveEdit(commentId: string) {
+    if (!user) return alert('Please sign in to edit comments');
+    const newText = editingText.trim();
+    if (!newText) return alert('Comment cannot be empty');
+
+    // Optimistic update
+    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: newText } : c)));
+    setEditingId(null);
+
+    const res = await updateCommentRow(commentId, user.id, newText);
+    if (!res.success) {
+      console.error('Failed to update comment:', res.error);
+      alert('Failed to update comment');
+      // reload comments to revert state
+      fetchComments().then(setComments);
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!user) return alert('Please sign in to delete comments');
+    const previous = comments;
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    const res = await deleteCommentRow(commentId, user.id);
+    if (!res.success) {
+      console.error('Failed to delete comment:', res.error);
+      setComments(previous);
+      alert('Failed to delete comment');
+    }
   }
 
   // Placeholder cast and similar
@@ -434,28 +469,47 @@ export default function MovieDetailPage() {
             </form>
 
             <div className="space-y-3">
-              {comments.map(c => (
-                <div key={c.id} className="bg-white/5 border border-white/10 p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white font-bold">{(c.commenterUsername ?? c.user_id).slice(0,1).toUpperCase()}</div>
-                      <div>
-                        <div className="font-semibold text-purple-200">{c.commenterUsername ?? c.user_id}</div>
-                        <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
+              {comments.map(c => {
+                const isOwner = !!user && user.id === c.user_id;
+                const isEditing = editingId === c.id;
+                return (
+                  <div key={c.id} className="bg-white/5 border border-white/10 p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white font-bold">{(c.commenterUsername ?? c.user_id).slice(0,1).toUpperCase()}</div>
+                        <div>
+                          <div className="font-semibold text-purple-200">{c.commenterUsername ?? c.user_id}</div>
+                          <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
+                        </div>
                       </div>
+                      <div className="text-sm text-pink-400 font-semibold">❤️ {c.likes ?? 0}</div>
                     </div>
-                    <div className="text-sm text-pink-400 font-semibold">❤️ {c.likes ?? 0}</div>
-                  </div>
-                  <p className="text-gray-100">{c.content}</p>
-                  <button
-                    className="mt-2 text-xs bg-pink-700 hover:bg-pink-600 px-3 py-1 rounded font-semibold text-white"
-                    onClick={() => toggleLikeComment(c.id)}
-                  >
-                    Like
-                  </button>
 
-                </div>
-              ))}
+                    {isEditing ? (
+                      <div>
+                        <textarea value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full p-2 text-black" />
+                        <div className="mt-2 flex gap-2">
+                          <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => handleSaveEdit(c.id)}>Save</button>
+                          <button className="px-3 py-1 bg-gray-600 text-white rounded" onClick={() => { setEditingId(null); setEditingText(''); }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-100">{c.content}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button className="text-xs bg-pink-700 hover:bg-pink-600 px-3 py-1 rounded font-semibold text-white" onClick={() => toggleLikeComment(c.id)}>Like</button>
+                          {isOwner && (
+                            <>
+                              <button className="text-xs px-3 py-1 rounded font-semibold bg-blue-600 text-white" onClick={() => { setEditingId(c.id); setEditingText(c.content); }}>Edit</button>
+                              <button className="text-xs px-3 py-1 rounded font-semibold bg-red-600 text-white" onClick={() => handleDeleteComment(c.id)}>Delete</button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
         </div>

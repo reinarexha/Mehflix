@@ -22,6 +22,9 @@ export default function Movie({ movie, userId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [likes, setLikes] = useState<{ [key: string]: boolean }>({});
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState<string>("");
 
   // Safe trailer identifier
   const trailerIdentifier = movie?.id?.toString() || "";
@@ -164,6 +167,58 @@ export default function Movie({ movie, userId }: Props) {
     }
   };
 
+  // Edit comment
+  const handleEditComment = async (commentId: string) => {
+    if (!editText.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ content: editText })
+        .eq('id', commentId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error updating comment:', error);
+        alert('Failed to update comment');
+        return;
+      }
+
+      // Update local state
+      setComments((prev) =>
+        prev.map((c) => (c.id === commentId ? { ...c, content: editText } : c))
+      );
+      setEditingId(null);
+      setEditText("");
+    } catch (error) {
+      console.error('Error updating comment:', error);
+    }
+  };
+
+  // Delete comment
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('Error deleting comment:', error);
+        alert('Failed to delete comment');
+        return;
+      }
+
+      // Update local state
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
+  };
+
   // Like/unlike a comment with notifications
   const toggleLike = async (commentId: string) => {
     if (!userId) {
@@ -228,6 +283,33 @@ export default function Movie({ movie, userId }: Props) {
     }
   };
 
+  // Load admin status
+  useEffect(() => {
+    async function loadAdminStatus() {
+      if (!userId) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', userId)
+          .single();
+        
+        if (!error && data) {
+          setIsAdmin(data.is_admin ?? false);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (e) {
+        console.warn('Failed to load admin status', e);
+        setIsAdmin(false);
+      }
+    }
+    loadAdminStatus();
+  }, [userId]);
+
   // Fetch comments when movie changes
   useEffect(() => {
     setComments([]); // clear old comments
@@ -269,29 +351,84 @@ export default function Movie({ movie, userId }: Props) {
           <p className="text-neutral-400 text-sm">No comments yet.</p>
         ) : (
           <div className="space-y-3">
-            {comments.map((comment) => (
-              <div key={comment.id} className="bg-neutral-800 rounded-xl p-3 text-sm flex flex-col">
-                <div className="flex justify-between items-center">
-                  <span className="text-blue-400 font-medium">
-                    {comment.commenterUsername ?? comment.user_id}
-                  </span>
-                  <span className="text-neutral-500 text-xs">
-                    {new Date(comment.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-neutral-200 mt-1">{comment.content}</p>
+            {comments.map((comment) => {
+              const isOwner = comment.user_id === userId;
+              const canEditDelete = isOwner && isAdmin;
+              const isEditing = editingId === comment.id;
 
-                <div className="flex items-center gap-2 mt-2">
-                  <button
-                    onClick={() => toggleLike(comment.id)}
-                    className={`flex items-center gap-1 text-sm ${likes[comment.id] ? "text-red-500" : "text-neutral-400"}`}
-                  >
-                    <Heart size={14} fill={likes[comment.id] ? "red" : "none"} />
-                    {comment.likes}
-                  </button>
+              return (
+                <div key={comment.id} className="bg-neutral-800 rounded-xl p-3 text-sm flex flex-col">
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-400 font-medium">
+                      {comment.commenterUsername ?? comment.user_id}
+                    </span>
+                    <span className="text-neutral-500 text-xs">
+                      {new Date(comment.created_at).toLocaleString()}
+                    </span>
+                  </div>
+                  
+                  {isEditing ? (
+                    <div className="mt-2">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full bg-neutral-700 text-white rounded px-2 py-1 text-sm"
+                        rows={2}
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => handleEditComment(comment.id)}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-xs"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditText("");
+                          }}
+                          className="px-3 py-1 bg-gray-600 hover:bg-gray-700 rounded text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-neutral-200 mt-1">{comment.content}</p>
+                  )}
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => toggleLike(comment.id)}
+                      className={`flex items-center gap-1 text-sm ${likes[comment.id] ? "text-red-500" : "text-neutral-400"}`}
+                    >
+                      <Heart size={14} fill={likes[comment.id] ? "red" : "none"} />
+                      {comment.likes}
+                    </button>
+                    
+                    {canEditDelete && !isEditing && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingId(comment.id);
+                            setEditText(comment.content);
+                          }}
+                          className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

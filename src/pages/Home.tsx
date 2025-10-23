@@ -62,15 +62,15 @@ useEffect(() => {
         [allMovies, comingSoon, newReleases] = await Promise.all([
           supabase.from('movies').select(`
             *, 
-            trailers(youtube_id)
+            trailers(youtube_key,youtube_url)
           `).order('release_date', { ascending: false }).limit(100),
           supabase.from('upcoming_movies').select(`
             *, 
-            trailers(youtube_id)
+            trailers(youtube_key,youtube_url)
           `).order('release_date', { ascending: true }).limit(50),
           supabase.from('new_releases').select(`
             *, 
-            trailers(youtube_id)
+            trailers(youtube_key,youtube_url)
           `).order('release_date', { ascending: false }).limit(50),
         ])
 

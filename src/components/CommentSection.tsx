@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "../hooks/useUser";
 import { supabase } from "../lib/supabaseClient";
 import { toggleLikeComment } from "../lib/data";
+import { updateComment as updateCommentRow, deleteComment as deleteCommentRow } from "../lib/data";
 
 type Profile = { username: string };
 type Movie = { title: string };
@@ -27,36 +28,41 @@ export default function CommentSection({ movieId, userId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const { user } = useUser()
   // Prefer the authenticated user's id from context but allow an override prop
   const resolvedUserId = userId ?? user?.id ?? null
 
-  // Load the signed-in user's profile username so optimistic comments show the username
+  // Load the signed-in user's profile username and admin status
   useEffect(() => {
     let mounted = true;
-    async function loadUsername() {
+    async function loadUserProfile() {
       if (!resolvedUserId) {
         setCurrentUsername(null);
+        setIsAdmin(false);
         return;
       }
       try {
         // First ensure the profile exists
         await ensureProfileExists(resolvedUserId);
         
-        const { data, error } = await supabase.from('profiles').select('username').eq('id', resolvedUserId).single();
+        const { data, error } = await supabase.from('profiles').select('username, is_admin').eq('id', resolvedUserId).single();
         if (!mounted) return;
         if (!error && data) {
           setCurrentUsername(data.username ?? `User-${resolvedUserId.slice(-6)}`);
+          setIsAdmin(data.is_admin ?? false);
         } else {
           console.warn('No profile found for user:', resolvedUserId);
           setCurrentUsername(`User-${resolvedUserId.slice(-6)}`);
+          setIsAdmin(false);
         }
       } catch (e) {
-        console.warn('Failed to load current username', e);
+        console.warn('Failed to load current user profile', e);
         setCurrentUsername(`User-${resolvedUserId.slice(-6)}`);
+        setIsAdmin(false);
       }
     }
-    loadUsername();
+    loadUserProfile();
     return () => {
       mounted = false;
     };
@@ -127,6 +133,7 @@ export default function CommentSection({ movieId, userId }: Props) {
         });
 
         setComments(mapped);
+  console.debug('CommentSection: resolvedUserId=', resolvedUserId, 'loaded comment user_ids=', mapped.map(m=>m.user_id));
         // If some rows lacked commenterUsername (join may have failed), fetch profiles separately
         const missingUserIds = Array.from(
           new Set(
@@ -234,6 +241,34 @@ export default function CommentSection({ movieId, userId }: Props) {
     }
   }
 
+  // Edit / Delete handlers
+  async function handleSaveEdit(commentId: string, newText: string) {
+    if (!resolvedUserId) return alert('Please sign in to edit comments');
+    // Optimistic update
+    setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: newText } : c)));
+    const res = await updateCommentRow(commentId, resolvedUserId, newText);
+    if (!res.success) {
+      console.error('Failed to update comment:', res.error);
+      // revert by reloading comments
+      // simple approach: reload comments from server
+      try { const { data, error } = await supabase.from('comments').select('*').eq('id', commentId).maybeSingle(); if (!error && data) setComments((prev)=> prev.map(c=> c.id===commentId? {...c, content: data.content}: c)); } catch (e) { console.warn('Could not revert comment after failed update', e); }
+      alert('Failed to update comment');
+    }
+  }
+
+  async function handleDelete(commentId: string) {
+    if (!resolvedUserId) return alert('Please sign in to delete comments');
+    // Optimistic removal
+    const previous = comments;
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    const res = await deleteCommentRow(commentId, resolvedUserId);
+    if (!res.success) {
+      console.error('Failed to delete comment:', res.error);
+      setComments(previous);
+      alert('Failed to delete comment');
+    }
+  }
+
   async function toggleLike(comment: Comment) {
     if (!resolvedUserId) return alert("Please sign in to like comments");
     setComments((prev) => prev.map((c) => (c.id === comment.id ? { ...c, likes: (c.likes ?? 0) + 1 } : c)));
@@ -265,24 +300,90 @@ export default function CommentSection({ movieId, userId }: Props) {
 
       <div className="space-y-3">
         {comments.map((c) => (
-          <div key={c.id} className="border-b border-gray-600 py-2">
-            <div className="text-sm font-semibold">
-              {c.commenterUsername ? `@${c.commenterUsername}` : `@User-${c.user_id.slice(-6)}`} on {c.movieTitle}
-            </div>
-            <div className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</div>
-            <div className="mt-2 text-white">{c.content}</div>
-            <div className="mt-2">
-              <button
-                onClick={() => toggleLike(c)}
-                className="px-2 py-1 rounded-sm border border-white/10 bg-white/5"
-              >
-                Like {c.likes ?? 0}
-              </button>
-            </div>
-            {c._unsynced && <div className="mt-2 text-sm text-yellow-300">Not saved: {c._error}</div>}
-          </div>
+          <CommentItem
+            key={c.id}
+            comment={c}
+            currentUserId={resolvedUserId}
+            isCurrentUserAdmin={isAdmin}
+            onSave={handleSaveEdit}
+            onDelete={handleDelete}
+            onLike={() => toggleLike(c)}
+          />
         ))}
       </div>
+    </div>
+  );
+}
+
+function CommentItem({
+  comment,
+  currentUserId,
+  isCurrentUserAdmin,
+  onSave,
+  onDelete,
+  onLike,
+}: {
+  comment: Comment;
+  currentUserId: string | null;
+  isCurrentUserAdmin: boolean;
+  onSave: (id: string, newText: string) => void;
+  onDelete: (id: string) => void;
+  onLike: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.content);
+
+  // Only show edit/delete for admins who own the comment
+  const isOwner = !!currentUserId && currentUserId === comment.user_id;
+  const canEditDelete = isOwner && isCurrentUserAdmin;
+
+  return (
+    <div className="border-b border-gray-600 py-2">
+      <div className="text-sm font-semibold">
+        {comment.commenterUsername ? `@${comment.commenterUsername}` : `@User-${comment.user_id.slice(-6)}`} on {comment.movieTitle}
+      </div>
+      <div className="text-xs text-gray-400">{new Date(comment.created_at).toLocaleString()}</div>
+      <div className="mt-2 text-white">
+        {editing ? (
+          <textarea className="w-full p-2 text-black" value={editText} onChange={(e) => setEditText(e.target.value)} />
+        ) : (
+          comment.content
+        )}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button onClick={onLike} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Like {comment.likes ?? 0}</button>
+
+        {canEditDelete && !editing && (
+          <>
+            <button onClick={() => setEditing(true)} className="px-2 py-1 rounded-sm border border-white/10 bg-white/5">Edit</button>
+            <button onClick={() => onDelete(comment.id)} className="px-2 py-1 rounded-sm border border-red-500 text-red-400">Delete</button>
+          </>
+        )}
+
+        {canEditDelete && editing && (
+          <>
+            <button
+              onClick={() => {
+                setEditing(false);
+                onSave(comment.id, editText);
+              }}
+              className="px-2 py-1 rounded-sm border border-green-500 text-green-400"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => {
+                setEditing(false);
+                setEditText(comment.content);
+              }}
+              className="px-2 py-1 rounded-sm border border-white/10 bg-white/5"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+      {comment._unsynced && <div className="mt-2 text-sm text-yellow-300">Not saved: {comment._error}</div>}
     </div>
   );
 }
