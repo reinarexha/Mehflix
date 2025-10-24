@@ -153,9 +153,7 @@ const Profile: React.FC = () => {
           trailer &&
           trailer.title &&
           trailer.title !== 'Unknown' &&
-          trailer.title !== 'Unknown Title' &&
-          trailer.poster_url &&
-          !trailer.poster_url.includes('placeholder.com')
+          trailer.title !== 'Unknown Title'
       )
 
       const validFavorites = favs.filter(
@@ -163,9 +161,7 @@ const Profile: React.FC = () => {
           trailer &&
           trailer.title &&
           trailer.title !== 'Unknown' &&
-          trailer.title !== 'Unknown Title' &&
-          trailer.poster_url &&
-          !trailer.poster_url.includes('placeholder.com')
+          trailer.title !== 'Unknown Title'
       )
 
       console.log('✅ Valid watchlist count:', validWatchlist.length)
@@ -341,23 +337,26 @@ const Profile: React.FC = () => {
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
               {watchlist.map((m) => (
-                <div key={m.id} className="flex-shrink-0 w-40">
+                <Link 
+                  key={m.id} 
+                  to={`/movie/${m.youtube_id || m.id}`}
+                  className="flex-shrink-0 w-40 hover:opacity-80 transition-opacity"
+                >
                   <img
-                    src={m.poster_url}
+                    src={m.poster_url || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
-
                       console.warn('❌ Image failed to load:', m.title, m.poster_url)
-
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}
                   />
                   <div className="mt-3 text-sm font-medium text-center truncate px-1">
                     {m.title}
+                    <div className="text-xs text-gray-400 break-all mt-1">{m.poster_url}</div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
@@ -382,15 +381,17 @@ const Profile: React.FC = () => {
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
               {favorites.map((m) => (
-                <div key={m.id} className="flex-shrink-0 w-40">
+                <Link 
+                  key={m.id} 
+                  to={`/movie/${m.youtube_id || m.id}`}
+                  className="flex-shrink-0 w-40 hover:opacity-80 transition-opacity"
+                >
                   <img
-                    src={m.poster_url}
+                    src={m.poster_url || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
-
                       console.warn('❌ Image failed to load:', m.title, m.poster_url)
-
                       ;(e.target as HTMLImageElement).src =
                         'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
                     }}
@@ -398,7 +399,7 @@ const Profile: React.FC = () => {
                   <div className="mt-3 text-sm font-medium text-center truncate px-1">
                     {m.title}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

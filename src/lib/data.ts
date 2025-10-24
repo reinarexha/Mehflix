@@ -277,8 +277,16 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
         try {
           const trailer = await getMovieById(id);
           if (!trailer) {
-            // console.warn(`❌ Trailer not found for favorite: ${id}`);
-            return null;
+            // If trailer lookup fails, return a fallback object so the UI can still show the item
+            // (some favorite rows may reference external youtube IDs or legacy ids not present in trailers table)
+            // Provide a poster via getDefaultPosterUrl so Profile's filters will accept it.
+            return {
+              id: String(id),
+              title: `Unknown Title`,
+              youtube_id: String(id),
+              category: 'Unknown',
+              poster_url: getDefaultPosterUrl()
+            } as Trailer;
           }
 
           // Ensure poster URL is valid
@@ -339,8 +347,13 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
         try {
           const trailer = await getMovieById(id);
           if (!trailer) {
-            // console.warn(`❌ Trailer not found for watchlist: ${id}`);
-            return null;
+            return {
+              id: String(id),
+              title: `Unknown Title`,
+              youtube_id: String(id),
+              category: 'Unknown',
+              poster_url: getDefaultPosterUrl()
+            } as Trailer;
           }
 
           // Ensure poster URL is valid

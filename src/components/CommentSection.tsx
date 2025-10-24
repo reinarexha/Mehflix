@@ -333,9 +333,9 @@ function CommentItem({
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(comment.content);
 
-  // Only show edit/delete for admins who own the comment
   const isOwner = !!currentUserId && currentUserId === comment.user_id;
-  const canEditDelete = isOwner && isCurrentUserAdmin;
+  // owners or admins may edit/delete
+  const canEditDelete = isOwner || isCurrentUserAdmin;
 
   return (
     <div className="border-b border-gray-600 py-2">

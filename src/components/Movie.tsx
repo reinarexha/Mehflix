@@ -353,7 +353,8 @@ export default function Movie({ movie, userId }: Props) {
           <div className="space-y-3">
             {comments.map((comment) => {
               const isOwner = comment.user_id === userId;
-              const canEditDelete = isOwner && isAdmin;
+              // owners or admins should be able to edit/delete
+              const canEditDelete = isOwner || isAdmin;
               const isEditing = editingId === comment.id;
 
               return (
