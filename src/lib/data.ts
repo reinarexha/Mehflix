@@ -444,13 +444,38 @@ export async function deleteComment(commentId: string, userId: string): Promise<
   if (!commentId || !userId) return { success: false, error: 'Invalid params' };
 
   try {
+    // First remove any likes for this comment to avoid foreign key/constraint errors
+    const { error: likesErr } = await supabase
+      .from('comment_likes')
+      .delete()
+      .eq('comment_id', commentId);
+
+    if (likesErr) {
+      // If deleting likes fails, log and continue to attempt comment deletion
+      console.warn('Warning: failed to delete comment likes before deleting comment', likesErr);
+    }
+
+    // Now delete the comment (only allow owner to delete)
     const { error } = await supabase
       .from('comments')
       .delete()
       .eq('id', commentId)
       .eq('user_id', userId);
 
-    if (error) return { success: false, error };
+    if (error) {
+      // If delete failed (likely due to FK constraints / RLS), try a soft-delete fallback:
+      try {
+        const { error: updErr } = await supabase
+          .from('comments')
+          .update({ content: '[deleted]' })
+          .eq('id', commentId)
+          .eq('user_id', userId);
+        if (updErr) return { success: false, error: { original: error, fallback: updErr } };
+        return { success: true };
+      } catch (e) {
+        return { success: false, error: { original: error, fallbackException: e } };
+      }
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: err };

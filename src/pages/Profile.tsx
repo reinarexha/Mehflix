@@ -6,8 +6,6 @@ import { supabase } from "../lib/supabaseClient"
 import {
   fetchWatchlist,
   fetchFavorites,
-  clearUserData,
-  cleanInvalidUserData,
   normalizePosterUrl,
   toggleFavorite,
   toggleWatchlist,
@@ -34,8 +32,6 @@ const Profile: React.FC = () => {
   const [favorites, setFavorites] = useState<Trailer[]>([])
 
   const [moviesLoading, setMoviesLoading] = useState(false)
-  const [clearingData, setClearingData] = useState(false)
-  const [cleaningData, setCleaningData] = useState(false)
 
   const navigate = useNavigate()
   const location = useLocation() // <-- for refresh after EditInfo
@@ -185,59 +181,7 @@ const Profile: React.FC = () => {
     loadMovies()
   }, [user])
 
-  // ---------------- Clean Invalid Data ----------------
-  const handleCleanData = async () => {
-    if (!user) return
-
-    const confirmClean = window.confirm(
-      'This will remove any corrupted or invalid movie entries from your watchlist and favorites. Continue?'
-    )
-
-    if (!confirmClean) return
-
-    setCleaningData(true)
-    try {
-      const result = await cleanInvalidUserData(user.id)
-      if (result.success) {
-        alert(`✅ ${result.message}`)
-        await loadMovies()
-      } else {
-        alert(`❌ ${result.message}`)
-      }
-    } catch (error) {
-      alert('❌ Failed to clean data')
-      console.error('Error cleaning data:', error)
-    } finally {
-      setCleaningData(false)
-    }
-  }
-
-  // ---------------- Clear All Data ----------------
-  const handleClearData = async () => {
-    if (!user) return
-
-    const confirmClear = window.confirm(
-      'Are you sure you want to clear ALL your watchlist and favorites data? This cannot be undone.'
-    )
-
-    if (!confirmClear) return
-
-    setClearingData(true)
-    try {
-      const result = await clearUserData(user.id)
-      if (result.success) {
-        alert(`✅ ${result.message}`)
-        await loadMovies()
-      } else {
-        alert(`❌ ${result.message}`)
-      }
-    } catch (error) {
-      alert('❌ Failed to clear data')
-      console.error('Error clearing data:', error)
-    } finally {
-      setClearingData(false)
-    }
-  }
+  // (Removed clean/clear handlers — no longer needed)
 
   // ---------------- Remove single items ----------------
   const handleRemoveFavorite = async (trailerId: string) => {
@@ -327,26 +271,6 @@ const Profile: React.FC = () => {
                 >
                   Edit Info
                 </Link>
-                <button
-                  onClick={loadMovies}
-                  className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors"
-                >
-                  Refresh Profile
-                </button>
-                <button
-                  onClick={handleCleanData}
-                  disabled={cleaningData}
-                  className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-                >
-                  {cleaningData ? 'Cleaning...' : 'Clean Invalid Data'}
-                </button>
-                <button
-                  onClick={handleClearData}
-                  disabled={clearingData}
-                  className="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-md transition-colors disabled:opacity-50"
-                >
-                  {clearingData ? 'Clearing...' : 'Clear All Data'}
-                </button>
                 <button
                   onClick={handleLogout}
                   className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md transition-colors"
