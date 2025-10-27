@@ -7,6 +7,7 @@ import {
   fetchFavorites,
   fetchWatchlist,
 } from '../lib/data'
+import { normalizePosterUrl } from '../lib/data'
 import type { Trailer } from '../lib/trailers'
 import { supabase } from '../lib/supabaseClient'
 
@@ -287,10 +288,10 @@ useEffect(() => {
     setFavoriteIds(next)
 
     try {
-      // Validate poster URL
-      let posterUrl = movie.poster_url || ''
-      if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
-        console.warn('âš ï¸ Invalid poster URL, using placeholder')
+      // Normalize poster URL (accept local paths like /posters/...) and fall back to placeholder only if missing
+      let posterUrl = normalizePosterUrl(movie.poster_url) || ''
+      if (!posterUrl || posterUrl.includes('placeholder.com')) {
+        console.warn('⚠️ Invalid or missing poster URL, using placeholder')
         posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
       }
 
@@ -346,10 +347,10 @@ useEffect(() => {
     setWatchlistIds(next)
 
     try {
-      // Validate poster URL
-      let posterUrl = movie.poster_url || ''
-      if (!posterUrl || posterUrl.includes('placeholder.com') || !posterUrl.startsWith('http')) {
-        console.warn('âš ï¸ Invalid poster URL, using placeholder')
+      // Normalize poster URL (accept local paths like /posters/...) and fall back to placeholder only if missing
+      let posterUrl = normalizePosterUrl(movie.poster_url) || ''
+      if (!posterUrl || posterUrl.includes('placeholder.com')) {
+        console.warn('⚠️ Invalid or missing poster URL, using placeholder')
         posterUrl = 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
       }
 

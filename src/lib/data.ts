@@ -108,7 +108,6 @@ export async function ensureTrailerExists(trailer: Trailer): Promise<boolean> {
 /* ========= Helper functions for poster URLs ========= */
 function isValidPosterUrl(url: string | null | undefined): boolean {
   if (!url) return false;
-  if (url.startsWith('/posters/')) return false; // Local paths are invalid
   if (url.includes('placeholder.com')) return false; // Placeholder is invalid
   if (url.includes('Unknown')) return false;
   return true;
@@ -287,6 +286,16 @@ export async function fetchFavorites(userId: string): Promise<Trailer[]> {
               category: 'Unknown',
               poster_url: getDefaultPosterUrl()
             } as Trailer;
+          }
+
+          // If the poster is a placeholder data URI, try to resolve a real poster from movie tables
+          if (!trailer.poster_url || trailer.poster_url.startsWith('data:')) {
+            try {
+              const resolved = await resolvePosterForTrailer(trailer);
+              trailer.poster_url = resolved || trailer.poster_url;
+            } catch (e) {
+              // ignore and keep existing
+            }
           }
 
           // Ensure poster URL is valid
@@ -681,3 +690,67 @@ export async function cleanInvalidUserData(userId: string): Promise<{
 
 // Export for debugging
 export const __DATA_MODULE = "DATA_MODULE_V7_NO_LOCAL_DATA_REMOVED_GET_TRAILER";
+
+/**
+ * Normalize poster URL for the browser.
+ * - Return data: URIs and absolute URLs unchanged
+ * - Convert local paths like `/posters/x.jpg` or `posters/x.jpg` to absolute URLs using window.location.origin
+ */
+export function normalizePosterUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  const trimmed = String(url).trim();
+  if (trimmed === '') return undefined;
+  // Already a data URI
+  if (trimmed.startsWith('data:')) return trimmed;
+  // Absolute URL (http/https)
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  // Otherwise treat as a local path and prefix with origin
+  try {
+    const origin = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+    if (!origin) return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return trimmed.startsWith('/') ? `${origin}${trimmed}` : `${origin}/${trimmed}`;
+  } catch (e) {
+    return trimmed;
+  }
+}
+
+/**
+ * Try to resolve a better poster URL for a trailer by looking up movie tables.
+ * Returns poster_url string or null if none found.
+ */
+async function resolvePosterForTrailer(trailer: Trailer): Promise<string | null> {
+  try {
+    const numericId = Number.isFinite(Number(trailer.id)) ? Number(trailer.id) : null;
+    const tables = ['movies', 'upcoming_movies', 'new_releases'];
+
+    if (numericId) {
+      for (const t of tables) {
+        try {
+          const { data, error } = await supabase.from(t).select('poster_url').eq('id', numericId).maybeSingle();
+          if (!error && data && (data as any).poster_url) return (data as any).poster_url as string;
+        } catch (e) {
+          // ignore and continue
+        }
+      }
+    }
+
+    const title = (trailer.title || '').trim();
+    if (title) {
+      const search = `%${title.replace(/%/g, '')}%`;
+      for (const t of tables) {
+        try {
+          const { data, error } = await supabase.from(t).select('poster_url, title').ilike('title', search).limit(1);
+          if (!error && data && data.length > 0 && (data[0] as any).poster_url) {
+            return (data[0] as any).poster_url as string;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}

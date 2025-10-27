@@ -7,7 +7,8 @@ import {
   fetchWatchlist,
   fetchFavorites,
   clearUserData,
-  cleanInvalidUserData
+  cleanInvalidUserData,
+  normalizePosterUrl,
 } from '../lib/data'
 import { getMovieById } from '../lib/trailers'
 
@@ -343,7 +344,7 @@ const Profile: React.FC = () => {
                   className="flex-shrink-0 w-40 hover:opacity-80 transition-opacity"
                 >
                   <img
-                    src={m.poster_url || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
+                    src={normalizePosterUrl(m.poster_url) || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
                     alt={m.title}
                     className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
                     onError={(e) => {
@@ -354,7 +355,6 @@ const Profile: React.FC = () => {
                   />
                   <div className="mt-3 text-sm font-medium text-center truncate px-1">
                     {m.title}
-                    <div className="text-xs text-gray-400 break-all mt-1">{m.poster_url}</div>
                   </div>
                 </Link>
               ))}

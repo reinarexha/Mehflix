@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import { useUser } from "../hooks/useUser";
 import type { Trailer } from "../lib/trailers"; // Type-only import
-import { fetchFavorites, toggleFavorite } from "../lib/data";
+import { fetchFavorites, toggleFavorite, normalizePosterUrl } from "../lib/data";
 import { getMovieById } from "../lib/trailers"; // Import the actual functions
 
 const FavoritesList = () => {
@@ -73,7 +73,7 @@ const FavoritesList = () => {
         <div key={trailer.id} className="relative group">
           <div className="aspect-[2/3] bg-gray-800 rounded-lg overflow-hidden">
             <img
-              src={trailer.poster_url}
+              src={normalizePosterUrl(trailer.poster_url)}
               alt={trailer.title}
               className="w-full h-full object-cover"
               onError={(e) => {

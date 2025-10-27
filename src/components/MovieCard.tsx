@@ -1,6 +1,7 @@
 ﻿// src/components/MovieCard.tsx
 import React from 'react'
 import type { Trailer } from '../lib/trailers'
+import { normalizePosterUrl } from '../lib/data'
 
 type MovieCardProps = {
   /** prefer using `movie`; `trailer` is kept for backward-compat */
@@ -22,8 +23,8 @@ const MovieCard: React.FC<MovieCardProps> = ({
   const t = movie ?? trailer
   if (!t) return null
 
-  // Use the poster_url from the trailer object, or create a fallback
-  const posterUrl = t.poster_url || `https://via.placeholder.com/300x450/1f2937/9ca3af?text=${encodeURIComponent(t.title || 'Movie')}`
+  // Use the poster_url from the trailer object, normalize local paths, or create a fallback
+  const posterUrl = normalizePosterUrl(t.poster_url) || `https://via.placeholder.com/300x450/1f2937/9ca3af?text=${encodeURIComponent(t.title || 'Movie')}`
   const trailerUrl = (() => {
     const raw = (t.youtube_id || '').trim()
     if (!raw) return undefined
