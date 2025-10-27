@@ -1,5 +1,4 @@
 import { Link, useLocation } from 'react-router-dom';
-import NotificationCenter from './NotificationCenter';
 
 export default function Navbar() {
   const { pathname } = useLocation();
@@ -33,7 +32,6 @@ export default function Navbar() {
 
         {/* Profile and notifications on the far right */}
         <div className="ml-4 flex items-center gap-3">
-          <NotificationCenter />
           <Link
             to="/profile"
             className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white hover:bg-purple-500 transition-colors duration-200"

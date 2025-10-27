@@ -92,7 +92,7 @@ export default function MoviePage() {
   }, [user, trailer?.id]);
 
   if (!id || Number.isNaN(movieId)) return <p>Invalid movie id.</p>;
-  if (loading) return <p>Loading movie from database...</p>;
+  if (loading) return <p>Loading movie...</p>;
   if (!movie || !trailer) return <p>Movie not found!</p>;
 
   const rd = (movie as any)?.release_date; const year = (typeof rd === "string" || typeof rd === "number") ? (new Date(rd).getFullYear() || "") : "";
@@ -142,8 +142,6 @@ export default function MoviePage() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Rate</button>
-          <button className="bg-white/15 hover:bg-white/25 text-white font-medium px-4 py-2 rounded-lg">Comment</button>
           <button
             className={`font-medium px-4 py-2 rounded-lg ${isFav ? 'bg-purple-600 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
             onClick={async () => {

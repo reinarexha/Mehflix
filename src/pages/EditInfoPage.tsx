@@ -1,5 +1,6 @@
 ﻿
 import { useState, useEffect } from "react";
+import { Link } from 'react-router-dom'
 import { supabase } from "../lib/supabaseClient";
 import { useUser } from "../hooks/useUser";
 
@@ -218,14 +219,8 @@ export default function EditInfoPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-300">New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (optional)"
-                className="bg-gray-700 border border-gray-600 px-3 py-2 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-              />
+              <label className="text-sm font-medium text-gray-300">Password</label>
+              <Link to="/change-password" className="text-sm text-blue-400 hover:underline">Change password</Link>
             </div>
 
             <button

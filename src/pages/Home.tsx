@@ -382,7 +382,7 @@ useEffect(() => {
     }
   }
 
-  if (loading) return <p className="text-white text-center">Loading movies from Supabase...</p>
+  if (loading) return <p className="text-white text-center">Loading movies...</p>
 
   // If none of the movie lists have data, show the global empty state.
   const hasAnyMovies = (movies && movies.length) || (comingSoonDb && comingSoonDb.length) || (newReleasesDb && newReleasesDb.length)

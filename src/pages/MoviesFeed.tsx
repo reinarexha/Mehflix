@@ -25,7 +25,7 @@ export default function MoviesFeed() {
     fetchMovies();
   }, []);
 
-  if (loading) return <p>Loading movies from Supabase...</p>;
+  if (loading) return <p>Loading movies...</p>;
   if (!movies.length) return <p>No movies found in Supabase.</p>;
 
   return (
