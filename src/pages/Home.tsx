@@ -416,7 +416,10 @@ useEffect(() => {
               background: 'var(--color-surface)',
               borderRadius: 'var(--radius-md)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              zIndex: 1000,
+              maxHeight: '60vh',
+              overflowY: 'auto'
             }}
           >
             {results.length === 0 && (
