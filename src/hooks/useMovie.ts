@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 type Movie = Record<string, unknown>;
@@ -10,53 +10,33 @@ export function useMovie(movieId: number) {
   useEffect(() => {
     if (!movieId) return;
 
-    const fetchMovie = async () => {
+    (async () => {
       setLoading(true);
-      
       try {
-        console.log(`🔍 Looking for movie ID: ${movieId}`);
-        
-        // Check all three movie tables: movies, upcoming_movies, new_releases
-        const [moviesResult, upcomingResult, newReleasesResult] = await Promise.all([
-          supabase.from('movies').select('*').eq('id', movieId).maybeSingle(),
+        // Prefer upcoming/new_releases when duplicates exist (fixes wrong movie on click)
+        const [upcomingResult, newReleasesResult, moviesResult] = await Promise.all([
           supabase.from('upcoming_movies').select('*').eq('id', movieId).maybeSingle(),
-          supabase.from('new_releases').select('*').eq('id', movieId).maybeSingle()
+          supabase.from('new_releases').select('*').eq('id', movieId).maybeSingle(),
+          supabase.from('movies').select('*').eq('id', movieId).maybeSingle(),
         ]);
 
-        // Check for errors
-        if (moviesResult.error && moviesResult.error.code !== 'PGRST116') {
-          console.error("Error fetching from movies table:", moviesResult.error.message);
-        }
-        if (upcomingResult.error && upcomingResult.error.code !== 'PGRST116') {
-          console.error("Error fetching from upcoming_movies table:", upcomingResult.error.message);
-        }
-        if (newReleasesResult.error && newReleasesResult.error.code !== 'PGRST116') {
-          console.error("Error fetching from new_releases table:", newReleasesResult.error.message);
-        }
+        const now = new Date();
+        const isFuture = (row: any) => { try { return row?.release_date && new Date(row.release_date) > now; } catch { return false } };
+        const within14 = (row: any) => { try { const d = new Date(row?.release_date); return isFinite(d as any) && ((now.getTime()-d.getTime())/(1000*60*60*24)) <= 14; } catch { return false } };
 
-        // Use the first result we find
-        const movieData = moviesResult.data || upcomingResult.data || newReleasesResult.data;
-        
-        if (movieData) {
-          const tableName = moviesResult.data ? 'movies' : 
-                           upcomingResult.data ? 'upcoming_movies' : 
-                           'new_releases';
-          console.log(`✅ Found movie in ${tableName} table:`, movieData);
-          setMovie(movieData);
-        } else {
-          console.warn(`❌ Movie with ID ${movieId} not found in any table`);
-          setMovie(null);
-        }
+        let chosen: any = null;
+        if (upcomingResult.data && isFuture(upcomingResult.data)) chosen = upcomingResult.data;
+        else if (newReleasesResult.data && within14(newReleasesResult.data)) chosen = newReleasesResult.data;
+        else chosen = upcomingResult.data || newReleasesResult.data || moviesResult.data || null;
 
+        setMovie(chosen);
       } catch (error) {
         console.error("Error fetching movie:", error);
         setMovie(null);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
-    };
-
-    fetchMovie();
+    })();
   }, [movieId]);
 
   return { movie, loading };
