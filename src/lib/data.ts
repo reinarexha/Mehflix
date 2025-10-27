@@ -365,6 +365,16 @@ export async function fetchWatchlist(userId: string): Promise<Trailer[]> {
             } as Trailer;
           }
 
+          // If the poster is a placeholder data URI, try to resolve a real poster from movie tables
+          if (!trailer.poster_url || trailer.poster_url.startsWith('data:')) {
+            try {
+              const resolved = await resolvePosterForTrailer(trailer);
+              trailer.poster_url = resolved || trailer.poster_url;
+            } catch (e) {
+              // ignore and keep existing
+            }
+          }
+
           // Ensure poster URL is valid
           if (!isValidPosterUrl(trailer.poster_url)) {
             trailer.poster_url = getDefaultPosterUrl();

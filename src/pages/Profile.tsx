@@ -9,6 +9,8 @@ import {
   clearUserData,
   cleanInvalidUserData,
   normalizePosterUrl,
+  toggleFavorite,
+  toggleWatchlist,
 } from '../lib/data'
 import { getMovieById } from '../lib/trailers'
 
@@ -237,6 +239,43 @@ const Profile: React.FC = () => {
     }
   }
 
+  // ---------------- Remove single items ----------------
+  const handleRemoveFavorite = async (trailerId: string) => {
+    if (!user) return
+    try {
+      const trailer = favorites.find((f) => f.id === trailerId) || {
+        id: trailerId,
+        title: 'Unknown Title',
+        youtube_id: trailerId,
+        category: 'Unknown',
+        poster_url: undefined,
+      }
+
+      await toggleFavorite(user.id, trailer as any)
+      await loadMovies()
+    } catch (e) {
+      console.error('Failed to remove favorite', e)
+    }
+  }
+
+  const handleRemoveWatchlist = async (trailerId: string) => {
+    if (!user) return
+    try {
+      const trailer = watchlist.find((w) => w.id === trailerId) || {
+        id: trailerId,
+        title: 'Unknown Title',
+        youtube_id: trailerId,
+        category: 'Unknown',
+        poster_url: undefined,
+      }
+
+      await toggleWatchlist(user.id, trailer as any)
+      await loadMovies()
+    } catch (e) {
+      console.error('Failed to remove from watchlist', e)
+    }
+  }
+
   // ---------------- Logout ----------------
   const handleLogout = async () => {
     try {
@@ -338,25 +377,36 @@ const Profile: React.FC = () => {
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
               {watchlist.map((m) => (
-                <Link 
-                  key={m.id} 
-                  to={`/movie/${m.youtube_id || m.id}`}
-                  className="flex-shrink-0 w-40 hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={normalizePosterUrl(m.poster_url) || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
-                    alt={m.title}
-                    className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
-                    onError={(e) => {
-                      console.warn('❌ Image failed to load:', m.title, m.poster_url)
-                      ;(e.target as HTMLImageElement).src =
-                        'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
-                    }}
-                  />
-                  <div className="mt-3 text-sm font-medium text-center truncate px-1">
-                    {m.title}
+                <div key={m.id} className="flex-shrink-0 w-40">
+                  <Link
+                    to={`/movie/${m.youtube_id || m.id}`}
+                    className="hover:opacity-80 transition-opacity block"
+                  >
+                    <img
+                      src={normalizePosterUrl(m.poster_url) || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
+                      alt={m.title}
+                      className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
+                      onError={(e) => {
+                        console.warn('❌ Image failed to load:', m.title, m.poster_url)
+                        ;(e.target as HTMLImageElement).src =
+                          'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
+                      }}
+                    />
+                    <div className="mt-3 text-sm font-medium text-center truncate px-1">
+                      {m.title}
+                    </div>
+                  </Link>
+
+                  <div className="mt-2 px-1">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemoveWatchlist(m.id) }}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 rounded w-full"
+                    >
+                      Remove from Watchlist
+                    </button>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
@@ -381,25 +431,36 @@ const Profile: React.FC = () => {
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
               {favorites.map((m) => (
-                <Link 
-                  key={m.id} 
-                  to={`/movie/${m.youtube_id || m.id}`}
-                  className="flex-shrink-0 w-40 hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={m.poster_url || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
-                    alt={m.title}
-                    className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
-                    onError={(e) => {
-                      console.warn('❌ Image failed to load:', m.title, m.poster_url)
-                      ;(e.target as HTMLImageElement).src =
-                        'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
-                    }}
-                  />
-                  <div className="mt-3 text-sm font-medium text-center truncate px-1">
-                    {m.title}
+                <div key={m.id} className="flex-shrink-0 w-40">
+                  <Link
+                    to={`/movie/${m.youtube_id || m.id}`}
+                    className="hover:opacity-80 transition-opacity block"
+                  >
+                    <img
+                      src={normalizePosterUrl(m.poster_url) || 'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'}
+                      alt={m.title}
+                      className="w-full h-56 object-cover rounded-lg hover:scale-105 transition-transform duration-200 shadow-lg"
+                      onError={(e) => {
+                        console.warn('❌ Image failed to load:', m.title, m.poster_url)
+                        ;(e.target as HTMLImageElement).src =
+                          'https://via.placeholder.com/300x450/374151/FFFFFF?text=No+Poster'
+                      }}
+                    />
+                    <div className="mt-3 text-sm font-medium text-center truncate px-1">
+                      {m.title}
+                    </div>
+                  </Link>
+
+                  <div className="mt-2 px-1">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleRemoveFavorite(m.id) }}
+                      className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 rounded w-full"
+                    >
+                      Remove from Favorites
+                    </button>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
